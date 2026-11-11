@@ -1,0 +1,37 @@
+# Luti Color Picker
+
+Seletor de cores para Linux com lupa, histórico visual das últimas cinco capturas e 11 formatos para copiar, incluindo HEX, RGB, HSL e LAB.
+
+## Instalação
+
+Extraia o pacote Linux e execute `./install.sh` dentro da pasta extraída. O instalador coloca o aplicativo e os atalhos em `~/.local`. Para executar pelo terminal, inclua `~/.local/bin` no `PATH` ou use `~/.local/bin/luti-color-picker`.
+
+O pacote requer GTK 3.24 e as bibliotecas de sistema compatíveis com a máquina de compilação. Em Wayland, a lupa usa Spectacle no KDE ou grim em compositores compatíveis. A alternativa via XDG Desktop Portal depende do compositor e fornece a cor sem a imagem de contexto. Os sons usam `canberra-gtk-play`, quando disponível.
+
+## Uso
+
+Use o botão de captura e clique no pixel desejado. A roda do mouse ajusta o zoom. Escape ou o botão direito cancelam a seleção. Clique em um cartão para copiar a cor no formato selecionado.
+
+A engrenagem abre **Settings**, onde você pode controlar a cópia automática, os sons e a permanência na bandeja após fechar a janela.
+
+```sh
+luti-color-picker --pick
+luti-color-picker --about
+luti-color-picker --background
+```
+
+O aplicativo salva o histórico e as preferências em `${XDG_DATA_HOME:-$HOME/.local/share}/luti-color-picker/state.json`. Se esse arquivo ainda não existir, ele lê o histórico anterior de `${XDG_CACHE_HOME:-$HOME/.cache}/colour-picker.json`.
+
+## Compilação e pacote
+
+Instale Rust, Cargo, as ferramentas de compilação e os arquivos de desenvolvimento do GTK 3.24.
+
+```sh
+cargo test --locked
+cargo run --locked
+./scripts/package-linux.sh
+```
+
+O pacote é gravado em `target/dist`. Gere o pacote em uma distribuição compatível com o público que vai usá-lo.
+
+Autor da versão Rust: **Lucas Tiago**. Veja o arquivo [LICENSE](LICENSE) para os termos MIT e os avisos de copyright preservados.

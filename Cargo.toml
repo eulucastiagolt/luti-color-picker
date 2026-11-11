@@ -1,0 +1,26 @@
+[package]
+name = "luti-color-picker"
+version = "1.0.0"
+edition = "2021"
+authors = ["Lucas Tiago"]
+license = "MIT"
+repository = "https://github.com/eulucastiagolt/luti-color-picker"
+description = "Desktop color picker with a magnifier and visual history"
+
+[[bin]]
+name = "luti-color-picker"
+path = "src/main.rs"
+
+[dependencies]
+gtk = { version = "0.18", package = "gtk", features = ["v3_24"] }
+gdk = "0.18"
+gdk-pixbuf = "0.18"
+gio = "0.18"
+glib = "0.18"
+cairo-rs = { version = "0.18", features = ["png"] }
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+base64 = "0.22"
+clap = { version = "4.5", features = ["derive"] }
+ashpd = { version = "0.9", default-features = false, features = ["async-std"] }
+ksni = { version = "0.3.7", features = ["blocking"] }

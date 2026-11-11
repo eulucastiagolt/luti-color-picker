@@ -1,0 +1,24 @@
+[Desktop Entry]
+Type=Application
+Name=Luti Color Picker
+GenericName=Color Picker
+GenericName[pt_BR]=Seletor de cores
+Comment=Capture screen colors and save them to a visual history
+Comment[pt_BR]=Capture cores da tela e salve em um histórico visual
+Exec=luti-color-picker
+Icon=io.github.eulucastiagolt.LutiColorPicker
+Terminal=false
+Categories=Graphics;GTK;
+Keywords=color;colour;picker;eyedropper;screen;
+StartupNotify=true
+Actions=Capture;About;
+
+[Desktop Action Capture]
+Name=Capture a color
+Name[pt_BR]=Capturar uma cor
+Exec=luti-color-picker --pick
+
+[Desktop Action About]
+Name=About
+Name[pt_BR]=Sobre
+Exec=luti-color-picker --about
