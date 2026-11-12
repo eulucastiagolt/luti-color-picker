@@ -7,7 +7,8 @@ Summary: Screen color picker with a magnifier and visual history
 License: MIT
 URL: https://github.com/eulucastiagolt/luti-color-picker
 Source0: payload.tar.gz
-Requires: gtk3 >= 3.24
+Requires: gtk4
+Recommends: pulseaudio-libs
 
 %description
 Capture screen colors, view your recent captures, and copy colors in eleven formats.

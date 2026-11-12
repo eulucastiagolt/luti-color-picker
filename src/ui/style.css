@@ -1,0 +1,135 @@
+window.luti {
+    background-color: #17131f;
+    color: #f7efff;
+    font-family: "Inter", sans-serif;
+}
+
+.luti headerbar {
+    background: #211a2d;
+    color: #f7efff;
+    border-bottom: 1px solid #3d304d;
+    box-shadow: none;
+    padding: 6px 12px;
+}
+
+.luti .brand-title {
+    font-size: 1.04em;
+    font-weight: 750;
+}
+
+.luti notebook {
+    background: #17131f;
+    color: #f7efff;
+    border: none;
+}
+
+.luti notebook > stack {
+    background: #17131f;
+    color: #f7efff;
+}
+
+.luti notebook > header {
+    background: #211a2d;
+    border-bottom: 1px solid #3d304d;
+    box-shadow: none;
+    padding: 0 10px;
+}
+
+.luti notebook tab {
+    color: #bfb1cd;
+    background: transparent;
+    box-shadow: none;
+    padding: 8px 12px;
+}
+
+.luti notebook tab:checked {
+    color: #ffcc8a;
+    box-shadow: inset 0 -3px #ffb966;
+}
+
+.luti button,
+.luti entry,
+.luti spinbutton.horizontal > text {
+    color: #f7efff;
+    background: #30253d;
+    border: 1px solid #493859;
+    border-radius: 8px;
+    box-shadow: none;
+    text-shadow: none;
+}
+
+.luti button:hover {
+    background: #463355;
+}
+
+.luti headerbar button:not(.capture) {
+    background: transparent;
+    border-color: transparent;
+}
+
+.luti spinbutton.horizontal {
+    background: transparent;
+    border: none;
+    box-shadow: none;
+}
+
+.luti spinbutton.horizontal > text {
+    padding: 0 8px;
+}
+
+.luti spinbutton.horizontal > button:dir(ltr) {
+    margin-left: 4px;
+}
+
+.luti spinbutton.horizontal > button:dir(rtl) {
+    margin-right: 4px;
+}
+
+.luti button:disabled {
+    opacity: 0.55;
+}
+
+.luti checkbutton check {
+    background: #30253d;
+    border-color: #7c6c8a;
+    box-shadow: none;
+}
+
+.luti checkbutton check:checked {
+    color: #28170b;
+    background: #ffb966;
+    border-color: #ffb966;
+}
+
+.luti button.capture {
+    color: #28170b;
+    background: #ffb966;
+    border-color: #ffb966;
+    font-weight: 750;
+    padding: 5px 12px;
+}
+
+.luti button.capture:hover {
+    background: #ffce94;
+}
+
+.luti .empty-state {
+    padding: 24px;
+}
+
+.luti .empty-heading {
+    font-size: 1.45em;
+    font-weight: 750;
+}
+
+.luti .color-card {
+    background: #251d31;
+    border: 1px solid #3d304d;
+    border-radius: 12px;
+    padding: 8px;
+}
+
+.luti label.highlighted {
+    background: #5f452d;
+    border-radius: 4px;
+}

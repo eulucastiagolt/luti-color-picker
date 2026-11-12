@@ -13,5 +13,17 @@
   </description>
   <launchable type="desktop-id">io.github.eulucastiagolt.LutiColorPicker.desktop</launchable>
   <url type="homepage">https://github.com/eulucastiagolt/luti-color-picker</url>
+  <releases>
+    <release version="1.1.0" date="2026-11-12">
+      <description>
+        <ul>
+          <li>Register a global shortcut to capture colors.</li>
+          <li>Open the magnifier at the pointer and configure its zoom limits.</li>
+          <li>Add history colors directly to the selected palette or choose a palette each time.</li>
+          <li>Play distinct sounds for capture and copy.</li>
+        </ul>
+      </description>
+    </release>
+  </releases>
   <content_rating type="oars-1.1"/>
 </component>

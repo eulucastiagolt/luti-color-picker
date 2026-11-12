@@ -8,6 +8,7 @@ command: luti-color-picker
 finish-args:
   - --socket=wayland
   - --socket=fallback-x11
+  - --socket=pulseaudio
   - --share=ipc
   - --talk-name=org.kde.StatusNotifierWatcher
 build-options:

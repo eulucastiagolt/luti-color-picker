@@ -1,6 +1,8 @@
 use gdk::prelude::*;
 use gdk_pixbuf::{InterpType, Pixbuf};
 use std::f64::consts::PI;
+use x11rb::connection::Connection;
+use x11rb::protocol::xproto::ConnectionExt;
 
 pub const SNAP_SIZE: i32 = 120;
 
@@ -15,8 +17,7 @@ pub fn is_wayland() -> bool {
 /// Captures the full workspace across all monitors seamlessly
 pub fn capture_fullscreen() -> Option<Pixbuf> {
     if !is_wayland() {
-        let root = gdk::Window::default_root_window();
-        return root.pixbuf(0, 0, root.width(), root.height());
+        return capture_x11();
     }
 
     let tmp_path = format!(
@@ -44,9 +45,7 @@ pub fn capture_fullscreen() -> Option<Pixbuf> {
     }
 
     // 2. Try grim (wlroots/Wayland)
-    let grim_status = std::process::Command::new("grim")
-        .arg(&tmp_path)
-        .status();
+    let grim_status = std::process::Command::new("grim").arg(&tmp_path).status();
 
     if let Ok(st) = grim_status {
         if st.success() {
@@ -61,10 +60,49 @@ pub fn capture_fullscreen() -> Option<Pixbuf> {
     None
 }
 
-/// Captures a crop of the root window at (x, y) with dimension (w, h) in X11
-pub fn snap_root_window(x: i32, y: i32, w: i32, h: i32) -> Option<Pixbuf> {
-    let root = gdk::Window::default_root_window();
-    root.pixbuf(x, y, w, h)
+fn capture_x11() -> Option<Pixbuf> {
+    let (connection, screen) = x11rb::connect(None).ok()?;
+    let screen = &connection.setup().roots[screen];
+    let width = screen.width_in_pixels;
+    let height = screen.height_in_pixels;
+    let (image, visual_id) =
+        x11rb::image::Image::get(&connection, screen.root, 0, 0, width, height).ok()?;
+    let visual = screen
+        .allowed_depths
+        .iter()
+        .flat_map(|depth| &depth.visuals)
+        .find(|visual| visual.visual_id == visual_id)?;
+    let channels = [visual.red_mask, visual.green_mask, visual.blue_mask].map(|mask| {
+        let shift = mask.trailing_zeros().min(31);
+        (mask, shift, u64::from(mask >> shift).max(1))
+    });
+    let mut pixels = Vec::with_capacity(usize::from(width) * usize::from(height) * 3);
+    for y in 0..height {
+        for x in 0..width {
+            let pixel = image.get_pixel(x, y);
+            pixels.extend(channels.map(|(mask, shift, max)| {
+                ((u64::from((pixel & mask) >> shift) * 255 + max / 2) / max) as u8
+            }));
+        }
+    }
+    Some(Pixbuf::from_mut_slice(
+        pixels,
+        gdk_pixbuf::Colorspace::Rgb,
+        false,
+        8,
+        i32::from(width),
+        i32::from(height),
+        i32::from(width) * 3,
+    ))
+}
+
+pub fn x11_pointer() -> Option<(i32, i32)> {
+    let (connection, screen) = x11rb::connect(None).ok()?;
+    let root = connection.setup().roots[screen].root;
+    let pointer = connection.query_pointer(root).ok()?.reply().ok()?;
+    pointer
+        .same_screen
+        .then_some((pointer.root_x.into(), pointer.root_y.into()))
 }
 
 /// Extracts RGB pixel from the center of the snapshot
@@ -136,17 +174,14 @@ pub fn render_magnifier(
     color: (u8, u8, u8),
 ) -> Option<Pixbuf> {
     let scaled_pb = latest_pb.scale_simple(SNAP_SIZE * 2, SNAP_SIZE * 2, InterpType::Nearest)?;
-    let scaled_subset = scaled_pb.new_subpixbuf(
-        SNAP_SIZE / 2 + 1,
-        SNAP_SIZE / 2 + 1,
-        SNAP_SIZE,
-        SNAP_SIZE,
-    );
+    let scaled_subset =
+        scaled_pb.new_subpixbuf(SNAP_SIZE / 2 + 1, SNAP_SIZE / 2 + 1, SNAP_SIZE, SNAP_SIZE);
 
     let target_width = SNAP_SIZE * zoom_level;
     let target_height = SNAP_SIZE * zoom_level;
 
-    let base = cairo::ImageSurface::create(cairo::Format::ARgb32, target_width, target_height).ok()?;
+    let base =
+        cairo::ImageSurface::create(cairo::Format::ARgb32, target_width, target_height).ok()?;
     let ctx = cairo::Context::new(&base).ok()?;
 
     ctx.scale(zoom_level as f64, zoom_level as f64);

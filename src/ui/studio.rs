@@ -47,35 +47,34 @@ fn page() -> GtkBox {
 }
 
 fn scrolled(child: &impl IsA<gtk::Widget>) -> ScrolledWindow {
-    let scroll = ScrolledWindow::new(None::<&gtk::Adjustment>, None::<&gtk::Adjustment>);
+    let scroll = ScrolledWindow::new();
     scroll.set_policy(PolicyType::Never, PolicyType::Automatic);
     scroll.set_min_content_height(120);
-    scroll.add(child);
+    scroll.set_child(Some(child));
     scroll
 }
 
 fn label(text: &str) -> Label {
     let label = Label::new(Some(text));
     label.set_xalign(0.0);
-    label.set_line_wrap(true);
+    label.set_wrap(true);
     label
 }
 
 fn swatch(rgb: Rgb) -> DrawingArea {
     let sample = DrawingArea::new();
     sample.set_size_request(48, 34);
-    sample.connect_draw(move |_, cr| {
+    sample.set_draw_func(move |_, cr, _, _| {
         let [r, g, b] = fractions(rgb);
         cr.set_source_rgb(r, g, b);
         let _ = cr.paint();
-        glib::Propagation::Proceed
     });
     sample
 }
 
 fn color_button(rgb: Rgb) -> ColorButton {
     let [r, g, b] = fractions(rgb);
-    ColorButton::with_rgba(&gdk::RGBA::new(r, g, b, 1.0))
+    ColorButton::with_rgba(&gdk::RGBA::new(r as f32, g as f32, b as f32, 1.0))
 }
 
 fn selected_rgb(button: &ColorButton) -> Rgb {
@@ -93,6 +92,7 @@ fn dialog(parent: &ApplicationWindow, title: &str, accept: &str) -> Dialog {
             (accept, ResponseType::Accept),
         ],
     );
+    dialog.add_css_class("luti");
     dialog.set_default_response(ResponseType::Accept);
     dialog.set_default_size(320, -1);
     dialog
@@ -105,14 +105,11 @@ fn edit_name(window: &ApplicationWindow, title: &str, initial: &str) -> Option<S
     name.set_text(initial);
     name.set_placeholder_text(Some("Palette name"));
     name.set_activates_default(true);
-    content.add(&name);
-    dialog.content_area().add(&content);
-    dialog.show_all();
-    let response = dialog.run();
+    content.append(&name);
+    dialog.content_area().append(&content);
+    let response = glib::MainContext::default().block_on(dialog.run_future());
     let name = name.text().trim().to_owned();
-    unsafe {
-        dialog.destroy();
-    }
+    dialog.close();
     (response == ResponseType::Accept && !name.is_empty()).then_some(name)
 }
 
@@ -125,16 +122,13 @@ fn edit_swatch(window: &ApplicationWindow, mut color: Swatch) -> Option<Swatch> 
     name.set_activates_default(true);
     let picker = color_button(color.rgb);
     picker.set_halign(Align::Start);
-    content.add(&name);
-    content.add(&picker);
-    dialog.content_area().add(&content);
-    dialog.show_all();
-    let response = dialog.run();
+    content.append(&name);
+    content.append(&picker);
+    dialog.content_area().append(&content);
+    let response = glib::MainContext::default().block_on(dialog.run_future());
     color.name = name.text().trim().to_owned();
     color.rgb = selected_rgb(&picker);
-    unsafe {
-        dialog.destroy();
-    }
+    dialog.close();
     (response == ResponseType::Accept).then_some(color)
 }
 
@@ -158,10 +152,9 @@ fn save_file(
         Some("Save"),
         Some("Cancel"),
     );
-    chooser.set_do_overwrite_confirmation(true);
     chooser.set_current_name(filename);
-    if chooser.run() == ResponseType::Accept {
-        if let Some(path) = chooser.filename() {
+    if glib::MainContext::default().block_on(chooser.run_future()) == ResponseType::Accept {
+        if let Some(path) = chooser.file().and_then(|file| file.path()) {
             match glib::file_set_contents(&path, &data) {
                 Ok(()) => status.set_text(&format!("Saved {}", path.display())),
                 Err(error) => status.set_text(&format!("Could not save: {error}")),
@@ -183,6 +176,12 @@ pub(super) struct PaletteEditor {
 
 impl PaletteEditor {
     pub(super) fn add_history_color(self: &Rc<Self>, color: Swatch) {
+        let choose_palette = self.inner.borrow().state.settings.choose_palette_for_history;
+        if !choose_palette && self.selected().is_some() {
+            self.edit_colors(|colors| colors.push(color));
+            return;
+        }
+
         let (Some(window), Some(selector)) = (self.window.upgrade(), self.selector.upgrade())
         else {
             return;
@@ -204,17 +203,14 @@ impl PaletteEditor {
             let dialog = dialog(&window, "Add to palette", "Add");
             let content = page();
             let preview = GtkBox::new(Orientation::Horizontal, 8);
-            preview.add(&swatch(color.rgb));
-            preview.add(&label(&format!("{} · {}", color.name, hex(color.rgb))));
-            content.add(&preview);
-            content.add(&choices);
-            dialog.content_area().add(&content);
-            dialog.show_all();
-            let response = dialog.run();
+            preview.append(&swatch(color.rgb));
+            preview.append(&label(&format!("{} · {}", color.name, hex(color.rgb))));
+            content.append(&preview);
+            content.append(&choices);
+            dialog.content_area().append(&content);
+            let response = glib::MainContext::default().block_on(dialog.run_future());
             let selected = choices.active().map(|index| index as usize);
-            unsafe {
-                dialog.destroy();
-            }
+            dialog.close();
             if response == ResponseType::Accept {
                 selected
             } else {
@@ -278,34 +274,35 @@ impl PaletteEditor {
         ) else {
             return;
         };
-        for child in list.children() {
+        while let Some(child) = list.first_child() {
             list.remove(&child);
         }
         let selected = self.selected();
         controls.set_sensitive(selected.is_some());
         palette_actions.set_sensitive(selected.is_some());
         let Some(index) = selected else {
-            list.add(&label("Create a palette to start adding colors."));
-            list.show_all();
+            list.append(&label("Create a palette to start adding colors."));
             return;
         };
         let colors = self.inner.borrow().state.palettes[index].colors.clone();
         if colors.is_empty() {
-            list.add(&label("Add a color or use the latest screen capture."));
+            list.append(&label("Add a color or use the latest screen capture."));
         }
         for (index, color) in colors.into_iter().enumerate() {
             let row = GtkBox::new(Orientation::Horizontal, 8);
-            row.add(&swatch(color.rgb));
+            row.append(&swatch(color.rgb));
             let description = if color.name.is_empty() {
                 hex(color.rgb)
             } else {
                 format!("{}\n{}", color.name, hex(color.rgb))
             };
-            row.pack_start(&label(&description), true, true, 0);
+            let description = label(&description);
+            description.set_hexpand(true);
+            row.append(&description);
             let edit = Button::with_label("Edit");
-            row.add(&edit);
+            row.append(&edit);
             let remove = Button::with_label("Remove");
-            row.add(&remove);
+            row.append(&remove);
             let editor = self.clone();
             edit.connect_clicked(move |_| {
                 if let Some(window) = editor.window.upgrade() {
@@ -320,9 +317,8 @@ impl PaletteEditor {
                     colors.remove(index);
                 })
             });
-            list.add(&row);
+            list.append(&row);
         }
-        list.show_all();
     }
 }
 
@@ -333,27 +329,30 @@ fn palette_page(window: &ApplicationWindow, inner: &State) -> (GtkBox, Rc<Palett
     for palette in &inner.borrow().state.palettes {
         selector.append_text(&palette.name);
     }
-    top.pack_start(&selector, true, true, 0);
+    selector.set_hexpand(true);
+    top.append(&selector);
     let new_palette = Button::with_label("New");
-    top.add(&new_palette);
+    top.append(&new_palette);
     let palette_actions = GtkBox::new(Orientation::Horizontal, 6);
     let rename = Button::with_label("Rename");
     let delete = Button::with_label("Delete");
-    palette_actions.add(&rename);
-    palette_actions.add(&delete);
-    top.add(&palette_actions);
-    root.add(&top);
+    palette_actions.append(&rename);
+    palette_actions.append(&delete);
+    top.append(&palette_actions);
+    root.append(&top);
 
     let list = GtkBox::new(Orientation::Vertical, 6);
-    root.pack_start(&scrolled(&list), true, true, 0);
+    let list_scroll = scrolled(&list);
+    list_scroll.set_vexpand(true);
+    root.append(&list_scroll);
 
     let controls = GtkBox::new(Orientation::Vertical, 6);
     let add_row = GtkBox::new(Orientation::Horizontal, 6);
     let add = Button::with_label("Add color");
     let latest = Button::with_label("Add latest capture");
-    add_row.add(&add);
-    add_row.add(&latest);
-    controls.add(&add_row);
+    add_row.append(&add);
+    add_row.append(&latest);
+    controls.append(&add_row);
     let export_row = GtkBox::new(Orientation::Horizontal, 6);
     let formats = ComboBoxText::new();
     for format in PaletteFormat::ALL {
@@ -361,12 +360,13 @@ fn palette_page(window: &ApplicationWindow, inner: &State) -> (GtkBox, Rc<Palett
     }
     formats.set_active(Some(0));
     let export = Button::with_label("Export palette");
-    export_row.pack_start(&formats, true, true, 0);
-    export_row.add(&export);
-    controls.add(&export_row);
-    root.add(&controls);
+    formats.set_hexpand(true);
+    export_row.append(&formats);
+    export_row.append(&export);
+    controls.append(&export_row);
+    root.append(&controls);
     let status = label("");
-    root.add(&status);
+    root.append(&status);
 
     let editor = Rc::new(PaletteEditor {
         window: window.downgrade(),
@@ -414,7 +414,7 @@ fn palette_page(window: &ApplicationWindow, inner: &State) -> (GtkBox, Rc<Palett
                     inner.state.palettes[index].name = name.clone();
                     persist(&inner.state);
                 }
-                ComboBoxTextExt::remove(&selector, index as i32);
+                selector.remove(index as i32);
                 selector.insert_text(index as i32, &name);
                 selector.set_active(Some(index as u32));
             }
@@ -433,12 +433,10 @@ fn palette_page(window: &ApplicationWindow, inner: &State) -> (GtkBox, Rc<Palett
             let confirm = dialog(&window, "Delete palette", "Delete");
             confirm
                 .content_area()
-                .add(&label("Delete this palette and all its colors?"));
-            confirm.show_all();
-            let response = confirm.run();
-            unsafe {
-                confirm.destroy();
-            }
+                .append(&label("Delete this palette and all its colors?"));
+            confirm.add_css_class("luti");
+            let response = glib::MainContext::default().block_on(confirm.run_future());
+            confirm.close();
             if response != ResponseType::Accept {
                 return;
             }
@@ -448,7 +446,7 @@ fn palette_page(window: &ApplicationWindow, inner: &State) -> (GtkBox, Rc<Palett
                 persist(&inner.state);
                 inner.state.palettes.len()
             };
-            ComboBoxTextExt::remove(&selector, index as i32);
+            selector.remove(index as i32);
             selector.set_active(count.checked_sub(1).map(|last| index.min(last) as u32));
             editor.refresh();
         }
@@ -548,7 +546,7 @@ impl GradientEditor {
         let Some(list) = self.list.upgrade() else {
             return;
         };
-        for child in list.children() {
+        while let Some(child) = list.first_child() {
             list.remove(&child);
         }
         let stops = self.inner.borrow().state.gradient.stops.clone();
@@ -557,17 +555,18 @@ impl GradientEditor {
             let row = GtkBox::new(Orientation::Horizontal, 8);
             let picker = color_button(stop.rgb);
             picker.set_title("Stop color");
-            row.add(&picker);
+            row.append(&picker);
             let value = label(&hex(stop.rgb));
-            row.pack_start(&value, true, true, 0);
+            value.set_hexpand(true);
+            row.append(&value);
             let position = SpinButton::with_range(0.0, 100.0, 1.0);
             position.set_value(f64::from(stop.percent));
             position.set_tooltip_text(Some("Stop position (%)"));
-            row.add(&position);
-            row.add(&Label::new(Some("%")));
+            row.append(&position);
+            row.append(&Label::new(Some("%")));
             let remove = Button::with_label("Remove");
             remove.set_sensitive(removable);
-            row.add(&remove);
+            row.append(&remove);
             let editor = self.clone();
             picker.connect_color_set(move |picker| {
                 let rgb = selected_rgb(picker);
@@ -586,9 +585,8 @@ impl GradientEditor {
                 });
                 editor.render_stops();
             });
-            list.add(&row);
+            list.append(&row);
         }
-        list.show_all();
     }
 }
 
@@ -596,40 +594,43 @@ fn gradient_page(window: &ApplicationWindow, inner: &State) -> GtkBox {
     let root = page();
     let preview = DrawingArea::new();
     preview.set_size_request(-1, 104);
-    preview.connect_draw({
+    preview.set_draw_func({
         let inner = inner.clone();
-        move |area, cr| {
-            let _ = inner.borrow().state.gradient.draw(
-                cr,
-                f64::from(area.allocated_width()),
-                f64::from(area.allocated_height()),
-            );
-            glib::Propagation::Proceed
+        move |_, cr, width, height| {
+            let _ = inner
+                .borrow()
+                .state
+                .gradient
+                .draw(cr, f64::from(width), f64::from(height));
         }
     });
-    root.add(&preview);
+    root.append(&preview);
     let controls = GtkBox::new(Orientation::Horizontal, 8);
-    controls.add(&Label::new(Some("Angle (°)")));
+    controls.append(&Label::new(Some("Angle (°)")));
     let angle = SpinButton::with_range(0.0, 359.0, 1.0);
     angle.set_value(f64::from(inner.borrow().state.gradient.angle));
-    controls.add(&angle);
+    controls.append(&angle);
     let add = Button::with_label("Add stop");
-    controls.pack_end(&add, false, false, 0);
-    root.add(&controls);
+    add.set_hexpand(true);
+    add.set_halign(Align::End);
+    controls.append(&add);
+    root.append(&controls);
     let list = GtkBox::new(Orientation::Vertical, 6);
-    root.pack_start(&scrolled(&list), true, true, 0);
+    let list_scroll = scrolled(&list);
+    list_scroll.set_vexpand(true);
+    root.append(&list_scroll);
     let css = Entry::new();
     css.set_editable(false);
     css.set_width_chars(1);
-    root.add(&css);
+    root.append(&css);
     let actions = GtkBox::new(Orientation::Horizontal, 6);
     let copy = Button::with_label("Copy CSS");
     let export = Button::with_label("Export PNG");
-    actions.add(&copy);
-    actions.add(&export);
-    root.add(&actions);
+    actions.append(&copy);
+    actions.append(&export);
+    root.append(&actions);
     let status = label("");
-    root.add(&status);
+    root.append(&status);
 
     let editor = Rc::new(GradientEditor {
         inner: inner.clone(),
@@ -655,9 +656,13 @@ fn gradient_page(window: &ApplicationWindow, inner: &State) -> GtkBox {
     });
     copy.connect_clicked({
         let status = status.clone();
+        let sound = inner.borrow().sound.clone();
         move |_| {
             clipboard::copy_to_clipboard(&css.text());
             status.set_text("CSS copied.");
+            if sound.get() {
+                crate::audio::Feedback::Copy.play();
+            }
         }
     });
     export.connect_clicked({
@@ -684,20 +689,22 @@ fn extract_page(
     let root = page();
     let controls = GtkBox::new(Orientation::Horizontal, 8);
     let open = Button::with_label("Open image");
-    controls.add(&open);
-    controls.add(&Label::new(Some("Colors")));
+    controls.append(&open);
+    controls.append(&Label::new(Some("Colors")));
     let count = SpinButton::with_range(2.0, 24.0, 1.0);
     count.set_value(8.0);
-    controls.add(&count);
-    root.add(&controls);
+    controls.append(&count);
+    root.append(&controls);
     let status = label("Choose an image to extract its dominant colors.");
-    root.add(&status);
+    root.append(&status);
     let list = GtkBox::new(Orientation::Vertical, 6);
-    root.pack_start(&scrolled(&list), true, true, 0);
+    let list_scroll = scrolled(&list);
+    list_scroll.set_vexpand(true);
+    root.append(&list_scroll);
     let save = Button::with_label("Create palette");
     save.set_sensitive(false);
     save.set_halign(Align::Start);
-    root.add(&save);
+    root.append(&save);
 
     let result = Rc::new(RefCell::new(None::<(String, Vec<Swatch>)>));
     let busy = Rc::new(std::cell::Cell::new(false));
@@ -731,7 +738,7 @@ fn extract_page(
             open.set_sensitive(false);
             count.set_sensitive(false);
             status.set_text("Extracting colors…");
-            for child in list.children() {
+            while let Some(child) = list.first_child() {
                 list.remove(&child);
             }
             result.borrow_mut().take();
@@ -760,11 +767,12 @@ fn extract_page(
                             .collect();
                         for color in &colors {
                             let row = GtkBox::new(Orientation::Horizontal, 8);
-                            row.add(&swatch(color.rgb));
-                            row.pack_start(&label(&hex(color.rgb)), true, true, 0);
-                            list.add(&row);
+                            row.append(&swatch(color.rgb));
+                            let description = label(&hex(color.rgb));
+                            description.set_hexpand(true);
+                            row.append(&description);
+                            list.append(&row);
                         }
-                        list.show_all();
                         status.set_text(&format!("{} · {} colors", name, colors.len()));
                         *result.borrow_mut() = Some((name, colors));
                         save.set_sensitive(true);
@@ -793,9 +801,9 @@ fn extract_page(
             let filter = FileFilter::new();
             filter.set_name(Some("Images"));
             filter.add_pixbuf_formats();
-            chooser.add_filter(filter);
-            if chooser.run() == ResponseType::Accept {
-                if let Some(path) = chooser.filename() {
+            chooser.add_filter(&filter);
+            if glib::MainContext::default().block_on(chooser.run_future()) == ResponseType::Accept {
+                if let Some(path) = chooser.file().and_then(|file| file.path()) {
                     *selected_file.borrow_mut() = Some(path);
                     run();
                 }

@@ -1,6 +1,9 @@
 #!/bin/sh
 set -eu
 
+export LUTI_COLOR_PICKER_LAUNCHER
+LUTI_COLOR_PICKER_LAUNCHER=$(readlink -f -- "$0")
+
 stage=$(mktemp -d)
 trap 'rm -rf -- "$stage"' EXIT
 offset=$(awk '/^__LUTI_ARCHIVE__$/ { print NR + 1; exit }' "$0")

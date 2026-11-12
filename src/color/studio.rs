@@ -366,10 +366,9 @@ mod tests {
         })
         .unwrap();
         use std::io::Write;
-        use std::os::fd::FromRawFd;
 
         let (fd, path) = glib::file_open_tmp(Some("luti-extraction-XXXXXX")).unwrap();
-        let mut file = unsafe { std::fs::File::from_raw_fd(fd) };
+        let mut file = std::fs::File::from(fd);
         file.write_all(&bytes).unwrap();
         drop(file);
         let colors = extract_colors(&path, 2);

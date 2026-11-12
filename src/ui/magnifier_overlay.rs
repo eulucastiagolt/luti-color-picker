@@ -1,10 +1,13 @@
 use gdk::prelude::*;
-use gdk::EventMask;
 use gdk_pixbuf::Pixbuf;
 use gtk::prelude::*;
-use gtk::{DrawingArea, Window, WindowType};
-use std::cell::RefCell;
+use gtk::{
+    DrawingArea, EventControllerKey, EventControllerMotion, EventControllerScroll,
+    EventControllerScrollFlags, GestureClick, Window,
+};
+use std::cell::{Cell, RefCell};
 use std::f64::consts::PI;
+use std::ops::RangeInclusive;
 use std::rc::Rc;
 
 use crate::color::formatters::format_color;
@@ -12,7 +15,7 @@ use crate::color::ColorDatabase;
 
 pub struct OverlayState {
     pub screenshot: Pixbuf,
-    pub mouse_pos: (f64, f64),
+    pub mouse_pos: Option<(f64, f64)>,
     pub zoom_level: i32,
     pub formatter: String,
     pub color_db: ColorDatabase,
@@ -23,9 +26,9 @@ pub struct MagnifierOverlay;
 impl MagnifierOverlay {
     pub fn start<F, C>(
         screenshot: Pixbuf,
-        screen: &gdk::Screen,
-        monitor_index: i32,
+        monitor: &gdk::Monitor,
         formatter: String,
+        zoom_range: RangeInclusive<i32>,
         snark_mode: bool,
         activation_token: Option<String>,
         on_pick: F,
@@ -34,99 +37,53 @@ impl MagnifierOverlay {
         F: Fn(u8, u8, u8, Pixbuf) + 'static,
         C: Fn() + 'static,
     {
-        let window = Window::new(WindowType::Toplevel);
+        let window = Window::new();
         if let Some(token) = activation_token.as_deref() {
             window.set_startup_id(token);
         }
-        window.set_title(crate::APP_NAME);
+        window.set_title(Some(crate::APP_NAME));
         window.set_decorated(false);
-        window.set_app_paintable(true);
-        window.set_can_focus(true);
-        window.set_screen(screen);
-        window.fullscreen_on_monitor(screen, monitor_index);
-        window.set_keep_above(true);
-
-        // Hide system mouse cursor on the magnifier canvas
-        if let Some(display) = gdk::Display::default() {
-            let blank_cursor = gdk::Cursor::from_name(&display, "none");
-            window.connect_realize(move |w| {
-                if let Some(gdk_win) = w.window() {
-                    gdk_win.set_cursor(blank_cursor.as_ref());
-                }
-            });
-        }
-
-        // Grab seat and keyboard/pointer focus on map
-        window.connect_map(|w| {
-            w.grab_focus();
-            if let Some(gw) = w.window() {
-                let display = gw.display();
-                if let Some(seat) = display.default_seat() {
-                    let _ = seat.grab(
-                        &gw,
-                        gdk::SeatCapabilities::ALL,
-                        false,
-                        None,
-                        None,
-                        None,
-                    );
-                }
-            }
-        });
-
-        window.add_events(
-            EventMask::POINTER_MOTION_MASK
-                | EventMask::BUTTON_PRESS_MASK
-                | EventMask::SCROLL_MASK
-                | EventMask::KEY_PRESS_MASK,
-        );
-
-        let initial_mouse = {
-            let display = screen.display();
-            let seat = display.default_seat();
-            let pointer = seat.and_then(|s| s.pointer());
-            if let Some(ptr) = pointer {
-                let (_, px, py) = ptr.position();
-                let (gx, gy) = if let Some(m) = display.monitor(monitor_index) {
-                    let g = m.geometry();
-                    (g.x(), g.y())
-                } else {
-                    (0, 0)
-                };
-                let lx = (px - gx).clamp(0, (screenshot.width() - 1).max(0)) as f64;
-                let ly = (py - gy).clamp(0, (screenshot.height() - 1).max(0)) as f64;
-                (lx, ly)
-            } else {
-                (
-                    screenshot.width() as f64 / 2.0,
-                    screenshot.height() as f64 / 2.0,
-                )
-            }
-        };
-
+        window.set_cursor_from_name(Some("none"));
+        window.fullscreen_on_monitor(monitor);
         let state = Rc::new(RefCell::new(OverlayState {
             screenshot,
-            mouse_pos: initial_mouse,
-            zoom_level: 3,
+            mouse_pos: None,
+            zoom_level: 3.clamp(*zoom_range.start(), *zoom_range.end()),
             formatter,
             color_db: ColorDatabase::new(snark_mode),
         }));
 
         let drawing_area = DrawingArea::new();
-        window.add(&drawing_area);
+        window.set_child(Some(&drawing_area));
 
         // Draw event
         {
             let state_clone = state.clone();
-            drawing_area.connect_draw(move |_, ctx| {
+            drawing_area.set_draw_func(move |area, ctx, width, height| {
                 let mut st = state_clone.borrow_mut();
-                let (mx, my) = st.mouse_pos;
+                ctx.scale(
+                    f64::from(width) / f64::from(st.screenshot.width()),
+                    f64::from(height) / f64::from(st.screenshot.height()),
+                );
                 let zoom = st.zoom_level as f64;
                 let radius = 70.0; // 140px diameter loupe
 
                 // 1. Paint background screenshot 1:1 on the monitor
                 ctx.set_source_pixbuf(&st.screenshot, 0.0, 0.0);
                 let _ = ctx.paint();
+
+                if st.mouse_pos.is_none() {
+                    st.mouse_pos = area.native().and_then(|native| {
+                        let surface = native.surface()?;
+                        let pointer = surface.display().default_seat()?.pointer()?;
+                        let (x, y, _) = surface.device_position(&pointer)?;
+                        Some((x, y))
+                    });
+                }
+                let Some((x, y)) = st.mouse_pos else {
+                    return;
+                };
+                let (mx, my) = screenshot_position(&st.screenshot, area, x, y);
 
                 // 2. Extract current pixel RGB
                 let px = (mx as i32).clamp(0, st.screenshot.width() - 1);
@@ -207,8 +164,10 @@ impl MagnifierOverlay {
                     .map(|e| e.width())
                     .unwrap_or(80.0);
                 let badge_w = text_w + 32.0 + (padding * 2.0);
-                let badge_x = (mx - (badge_w / 2.0))
-                    .clamp(10.0, (st.screenshot.width() as f64 - badge_w - 10.0).max(10.0));
+                let badge_x = (mx - (badge_w / 2.0)).clamp(
+                    10.0,
+                    (st.screenshot.width() as f64 - badge_w - 10.0).max(10.0),
+                );
 
                 // Badge background
                 ctx.rectangle(badge_x, badge_y, badge_w, badge_h);
@@ -235,161 +194,105 @@ impl MagnifierOverlay {
                 ctx.set_source_rgba(1.0, 1.0, 1.0, 1.0);
                 ctx.move_to(badge_x + 26.0, badge_y + 17.0);
                 let _ = ctx.show_text(&formatted_text);
-
-                glib::Propagation::Proceed
             });
         }
 
-        // Mouse Motion
+        let motion = EventControllerMotion::new();
         {
-            let state_clone = state.clone();
-            let da_clone = drawing_area.clone();
-            window.connect_motion_notify_event(move |_, ev| {
-                let (x, y) = ev.position();
-                state_clone.borrow_mut().mouse_pos = (x, y);
-                da_clone.queue_draw();
-                glib::Propagation::Proceed
-            });
+            let state = state.clone();
+            let area = drawing_area.clone();
+            let update_position = move |_: &EventControllerMotion, x, y| {
+                state.borrow_mut().mouse_pos = Some((x, y));
+                area.queue_draw();
+            };
+            motion.connect_enter(update_position.clone());
+            motion.connect_motion(update_position);
         }
+        window.add_controller(motion);
 
-        // Scroll (Zoom level 2 to 7)
+        let scroll = EventControllerScroll::new(
+            EventControllerScrollFlags::VERTICAL | EventControllerScrollFlags::DISCRETE,
+        );
         {
-            let state_clone = state.clone();
-            let da_clone = drawing_area.clone();
-            window.connect_scroll_event(move |_, ev| {
-                let mut st = state_clone.borrow_mut();
-                match ev.direction() {
-                    gdk::ScrollDirection::Up => {
-                        if st.zoom_level < 7 {
-                            st.zoom_level += 1;
-                        }
-                    }
-                    gdk::ScrollDirection::Down => {
-                        if st.zoom_level > 2 {
-                            st.zoom_level -= 1;
-                        }
-                    }
-                    _ => {}
-                }
-                da_clone.queue_draw();
-                glib::Propagation::Proceed
-            });
-        }
-
-        let picked = Rc::new(RefCell::new(false));
-
-        let ungrab = |w: &Window| {
-            if let Some(gw) = w.window() {
-                let display = gw.display();
-                if let Some(seat) = display.default_seat() {
-                    seat.ungrab();
-                }
-                gw.set_cursor(None);
-            }
-        };
-
-        // Window destroy (Cancel cleanup and cursor restore)
-        {
-            let picked_clone = picked.clone();
-            let on_cancel_rc = Rc::new(on_cancel);
-            window.connect_destroy(move |w| {
-                if let Some(gw) = w.window() {
-                    let display = gw.display();
-                    if let Some(seat) = display.default_seat() {
-                        seat.ungrab();
-                    }
-                    gw.set_cursor(None);
-                }
-                if !*picked_clone.borrow() {
-                    *picked_clone.borrow_mut() = true;
-                    on_cancel_rc();
-                }
-            });
-        }
-
-        // Key Press (Escape to cancel)
-        {
-            let win_weak = window.downgrade();
-            window.connect_key_press_event(move |_, ev| {
-                if ev.keyval() == gdk::keys::constants::Escape {
-                    if let Some(win) = win_weak.upgrade() {
-                        ungrab(&win);
-                        unsafe { win.destroy(); }
-                    }
-                    return glib::Propagation::Stop;
-                }
-                glib::Propagation::Proceed
-            });
-        }
-
-        // Click event (Pick pixel or Cancel)
-        {
-            let state_clone = state;
-            let win_weak = window.downgrade();
-            let on_pick_rc = Rc::new(on_pick);
-            let picked_clone = picked.clone();
-            window.connect_button_press_event(move |_, ev| {
-                // Ignore double/triple click events or non-press events
-                if ev.event_type() != gdk::EventType::ButtonPress {
-                    return glib::Propagation::Stop;
-                }
-
-                if ev.button() == 1 {
-                    // Prevent duplicate invocations
-                    if *picked_clone.borrow() {
-                        return glib::Propagation::Stop;
-                    }
-                    *picked_clone.borrow_mut() = true;
-
-                    let st = state_clone.borrow();
-                    let (mx, my) = ev.position();
-                    let px = (mx as i32).clamp(0, st.screenshot.width() - 1);
-                    let py = (my as i32).clamp(0, st.screenshot.height() - 1);
-
-                    let n_channels = st.screenshot.n_channels();
-                    let rowstride = st.screenshot.rowstride();
-                    let pixels = unsafe { st.screenshot.pixels() };
-                    let offset = (rowstride * py + px * n_channels) as usize;
-
-                    let (r, g, b) = if offset + 2 < pixels.len() {
-                        (pixels[offset], pixels[offset + 1], pixels[offset + 2])
-                    } else {
-                        (0, 0, 0)
-                    };
-
-                    // Extract 60x60 context crop
-                    let crop_size = 60;
-                    let src_x = (px - crop_size / 2).clamp(0, (st.screenshot.width() - crop_size).max(0));
-                    let src_y = (py - crop_size / 2).clamp(0, (st.screenshot.height() - crop_size).max(0));
-                    let crop = st.screenshot.new_subpixbuf(
-                        src_x,
-                        src_y,
-                        crop_size.min(st.screenshot.width()),
-                        crop_size.min(st.screenshot.height()),
-                    );
-
-                    if let Some(win) = win_weak.upgrade() {
-                        ungrab(&win);
-                        unsafe { win.destroy(); }
-                    }
-                    on_pick_rc(r, g, b, crop);
-                    return glib::Propagation::Stop;
-                } else if ev.button() == 3 {
-                    // Right click cancels
-                    if let Some(win) = win_weak.upgrade() {
-                        ungrab(&win);
-                        unsafe { win.destroy(); }
-                    }
-                    return glib::Propagation::Stop;
+            let state = state.clone();
+            let area = drawing_area.clone();
+            scroll.connect_scroll(move |_, _, dy| {
+                let mut state = state.borrow_mut();
+                if dy != 0.0 {
+                    state.zoom_level = (state.zoom_level - dy.signum() as i32)
+                        .clamp(*zoom_range.start(), *zoom_range.end());
+                    area.queue_draw();
                 }
                 glib::Propagation::Stop
             });
         }
+        window.add_controller(scroll);
 
-        window.show_all();
-        if let Some(token) = activation_token.as_deref() {
-            window.set_startup_id(token);
-        }
+        let finished = Rc::new(Cell::new(false));
+        window.connect_close_request({
+            let finished = finished.clone();
+            move |_| {
+                if !finished.replace(true) {
+                    on_cancel();
+                }
+                glib::Propagation::Proceed
+            }
+        });
+
+        let keys = EventControllerKey::new();
+        let weak_window = window.downgrade();
+        keys.connect_key_pressed(move |_, key, _, _| {
+            if key == gdk::Key::Escape {
+                if let Some(window) = weak_window.upgrade() {
+                    window.close();
+                }
+                return glib::Propagation::Stop;
+            }
+            glib::Propagation::Proceed
+        });
+        window.add_controller(keys);
+
+        let click = GestureClick::new();
+        click.set_button(0);
+        let weak_window = window.downgrade();
+        click.connect_pressed(move |gesture, count, x, y| {
+            let Some(window) = weak_window.upgrade() else {
+                return;
+            };
+            match gesture.current_button() {
+                1 if count == 1 && !finished.replace(true) => {
+                    let state = state.borrow();
+                    let screenshot = &state.screenshot;
+                    let (x, y) = screenshot_position(screenshot, &drawing_area, x, y);
+                    let x = (x as i32).clamp(0, screenshot.width() - 1);
+                    let y = (y as i32).clamp(0, screenshot.height() - 1);
+                    let pixels = screenshot.read_pixel_bytes();
+                    let offset =
+                        (screenshot.rowstride() * y + screenshot.n_channels() * x) as usize;
+                    let [r, g, b] = [pixels[offset], pixels[offset + 1], pixels[offset + 2]];
+                    let width = 60.min(screenshot.width());
+                    let height = 60.min(screenshot.height());
+                    let crop = screenshot.new_subpixbuf(
+                        (x - width / 2).clamp(0, screenshot.width() - width),
+                        (y - height / 2).clamp(0, screenshot.height() - height),
+                        width,
+                        height,
+                    );
+                    window.close();
+                    on_pick(r, g, b, crop);
+                }
+                3 => window.close(),
+                _ => {}
+            }
+        });
+        window.add_controller(click);
         window.present();
     }
+}
+
+fn screenshot_position(screenshot: &Pixbuf, area: &DrawingArea, x: f64, y: f64) -> (f64, f64) {
+    (
+        x * f64::from(screenshot.width()) / f64::from(area.width().max(1)),
+        y * f64::from(screenshot.height()) / f64::from(area.height().max(1)),
+    )
 }

@@ -1,4 +1,4 @@
-use glib::Sender;
+use async_channel::Sender;
 use ksni::blocking::TrayMethods;
 use ksni::menu::{MenuItem, StandardItem};
 
@@ -49,13 +49,13 @@ impl ksni::Tray for PickTray {
     // Left click on tray icon: open magnifier directly
     fn activate(&mut self, _x: i32, _y: i32) {
         let token = get_activation_token();
-        let _ = self.tx.send(TrayCommand::PickColor(token));
+        let _ = self.tx.try_send(TrayCommand::PickColor(token));
     }
 
     // Secondary activate (middle click): show window
     fn secondary_activate(&mut self, _x: i32, _y: i32) {
         let token = get_activation_token();
-        let _ = self.tx.send(TrayCommand::ShowWindow(token));
+        let _ = self.tx.try_send(TrayCommand::ShowWindow(token));
     }
 
     // Right click on tray icon: context menu
@@ -71,7 +71,7 @@ impl ksni::Tray for PickTray {
                 icon_name: "color-picker".into(),
                 activate: Box::new(move |_| {
                     let token = get_activation_token();
-                    let _ = tx_pick.send(TrayCommand::PickColor(token));
+                    let _ = tx_pick.try_send(TrayCommand::PickColor(token));
                 }),
                 ..Default::default()
             }
@@ -81,7 +81,7 @@ impl ksni::Tray for PickTray {
                 icon_name: "window-new".into(),
                 activate: Box::new(move |_| {
                     let token = get_activation_token();
-                    let _ = tx_show.send(TrayCommand::ShowWindow(token));
+                    let _ = tx_show.try_send(TrayCommand::ShowWindow(token));
                 }),
                 ..Default::default()
             }
@@ -91,7 +91,7 @@ impl ksni::Tray for PickTray {
                 label: "Sobre".into(),
                 icon_name: "help-about".into(),
                 activate: Box::new(move |_| {
-                    let _ = tx_about.send(TrayCommand::ShowAbout);
+                    let _ = tx_about.try_send(TrayCommand::ShowAbout);
                 }),
                 ..Default::default()
             }
@@ -100,7 +100,7 @@ impl ksni::Tray for PickTray {
                 label: "Sair".into(),
                 icon_name: "application-exit".into(),
                 activate: Box::new(move |_| {
-                    let _ = tx_quit.send(TrayCommand::Quit);
+                    let _ = tx_quit.try_send(TrayCommand::Quit);
                 }),
                 ..Default::default()
             }

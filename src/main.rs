@@ -1,4 +1,5 @@
 pub mod audio;
+mod autostart;
 pub mod capture;
 pub mod color;
 pub mod storage;
@@ -47,17 +48,17 @@ fn main() {
         let current_window = current_window.clone();
         move |app, command| {
             let Ok(args) = Args::try_parse_from(command.arguments()) else {
-                return 2;
+                return 2.into();
             };
 
             let window = {
                 let mut current = current_window.borrow_mut();
                 let main_window = current
                     .get_or_insert_with(|| MainWindow::new(app, args.snark, args.background));
-                main_window.window.show_all();
-                main_window.window.present();
                 if args.pick {
                     main_window.capture();
+                } else {
+                    main_window.window.present();
                 }
                 main_window.window.clone()
             };
@@ -65,15 +66,16 @@ fn main() {
                 let window = window.downgrade();
                 glib::idle_add_local_once(move || {
                     if let Some(window) = window.upgrade() {
+                        window.present();
                         ui::about::show_about_dialog(Some(window.upcast_ref()));
                     }
                 });
             }
-            0
+            glib::ExitCode::SUCCESS
         }
     });
 
     let exit_code = app.run();
     current_window.borrow_mut().take();
-    std::process::exit(exit_code.value());
+    std::process::exit(exit_code.get().into());
 }

@@ -15,14 +15,15 @@ apps:
   luti-color-picker:
     command: usr/bin/luti-color-picker
     extensions: [gnome]
-    plugs: [wayland, x11, desktop, desktop-legacy]
+    plugs: [wayland, x11, desktop, desktop-legacy, audio-playback]
 
 parts:
   luti:
     plugin: rust
     source: .
     rust-channel: stable
-    build-packages: [pkg-config, libgtk-3-dev]
+    build-packages: [pkg-config, libgtk-4-dev]
+    stage-packages: [libpulse0]
     override-pull: |
       craftctl default
       craftctl set version="$(sed -n 's/^version = "\([^"]*\)"$/\1/p' Cargo.toml | head -n 1)"

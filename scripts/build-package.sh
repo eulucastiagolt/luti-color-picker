@@ -148,8 +148,9 @@ Section: graphics
 Priority: optional
 Architecture: $deb_arch
 Maintainer: Lucas Tiago <eulucastiago@outlook.com>
-Depends: libc6 (>= $glibc), libgtk-3-0t64 (>= 3.24) | libgtk-3-0 (>= 3.24)
-Suggests: xdg-desktop-portal, spectacle | grim, libcanberra-gtk3-module
+Depends: libc6 (>= $glibc), libgtk-4-1
+Recommends: libpulse0
+Suggests: xdg-desktop-portal, spectacle | grim
 Homepage: https://github.com/eulucastiagolt/luti-color-picker
 Description: Screen color picker with a magnifier and visual history
  Capture and copy screen colors in eleven formats.

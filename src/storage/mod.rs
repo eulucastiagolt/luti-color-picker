@@ -1,7 +1,11 @@
 use crate::color::studio::{Gradient, Palette};
 use serde::{Deserialize, Serialize};
 use std::fs;
+use std::ops::RangeInclusive;
 use std::path::PathBuf;
+
+pub const MIN_ZOOM: i32 = 1;
+pub const MAX_ZOOM: i32 = 20;
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
 pub struct HistoryColorItem {
@@ -27,6 +31,10 @@ pub struct Settings {
     pub auto_copy: bool,
     pub sound: bool,
     pub background: bool,
+    pub global_shortcut: bool,
+    pub min_zoom: i32,
+    pub max_zoom: i32,
+    pub choose_palette_for_history: bool,
 }
 
 impl Default for Settings {
@@ -35,7 +43,18 @@ impl Default for Settings {
             auto_copy: true,
             sound: true,
             background: false,
+            global_shortcut: false,
+            min_zoom: 2,
+            max_zoom: 7,
+            choose_palette_for_history: false,
         }
+    }
+}
+
+impl Settings {
+    pub fn zoom_range(&self) -> RangeInclusive<i32> {
+        let min = self.min_zoom.clamp(MIN_ZOOM, MAX_ZOOM);
+        min..=self.max_zoom.clamp(min, MAX_ZOOM)
     }
 }
 
@@ -73,7 +92,9 @@ impl Default for AppState {
 }
 
 pub fn get_cache_file_path() -> PathBuf {
-    glib::user_data_dir().join("luti-color-picker").join("state.json")
+    glib::user_data_dir()
+        .join("luti-color-picker")
+        .join("state.json")
 }
 
 pub fn load_state() -> AppState {
@@ -90,13 +111,21 @@ pub fn load_state() -> AppState {
         Ok(content) => match serde_json::from_str::<AppState>(&content) {
             Ok(state) => state,
             Err(e) => {
-                eprintln!("Failed to parse {}: {}, assuming defaults", path.display(), e);
+                eprintln!(
+                    "Failed to parse {}: {}, assuming defaults",
+                    path.display(),
+                    e
+                );
                 AppState::default()
             }
         },
         Err(e) if e.kind() == std::io::ErrorKind::NotFound => AppState::default(),
         Err(e) => {
-            eprintln!("Failed to read {}: {}, assuming defaults", path.display(), e);
+            eprintln!(
+                "Failed to read {}: {}, assuming defaults",
+                path.display(),
+                e
+            );
             AppState::default()
         }
     }

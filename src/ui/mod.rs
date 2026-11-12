@@ -4,6 +4,7 @@ pub mod color_card;
 pub mod empty_state;
 pub mod magnifier_overlay;
 mod settings;
+mod shortcuts;
 mod studio;
 pub mod tray;
 
@@ -13,13 +14,11 @@ use crate::color::ColorDatabase;
 use crate::storage::{load_state, save_state, AppState, HistoryColorItem, WindowMetrics};
 use color_card::ColorCard;
 use gdk::prelude::*;
-use gdk::EventMask;
 use gdk_pixbuf::Pixbuf;
 use gtk::prelude::*;
 use gtk::{
-    Application, ApplicationWindow, Button, CellRendererText, ComboBox, CssProvider,
-    Frame, HeaderBar, Image, Label, ListStore, Orientation, Revealer, RevealerTransitionType,
-    StateFlags, STYLE_PROVIDER_PRIORITY_APPLICATION,
+    Align, Application, ApplicationWindow, Button, ComboBoxText, CssProvider, HeaderBar, Image,
+    Label, Orientation, Revealer, RevealerTransitionType, STYLE_PROVIDER_PRIORITY_APPLICATION,
 };
 use magnifier_overlay::MagnifierOverlay;
 use std::cell::{Cell, RefCell};
@@ -29,6 +28,7 @@ pub struct MainWindow {
     pub window: ApplicationWindow,
     _tray_handle: Option<ksni::blocking::Handle<tray::PickTray>>,
     grab: Rc<dyn Fn(Option<String>)>,
+    _shortcut: Rc<shortcuts::GlobalShortcut>,
 }
 
 struct AppInner {
@@ -42,8 +42,6 @@ struct AppInner {
     btn_clear: Button,
     highlight_hex: String,
     lowlight_hex: String,
-    window_metrics_restored: bool,
-    resize_timeout_id: Option<glib::SourceId>,
 }
 
 impl MainWindow {
@@ -54,113 +52,70 @@ impl MainWindow {
 
     pub fn new(app: &Application, snark_mode: bool, force_background: bool) -> Self {
         let window = ApplicationWindow::new(app);
-        window.set_title(crate::APP_NAME);
-        window.set_size_request(400, 440);
-        window.set_default_size(480, 570);
+        window.set_title(Some(crate::APP_NAME));
+        window.add_css_class("luti");
+        window.set_size_request(460, 440);
+        window.set_default_size(620, 620);
 
-        // HeaderBar
         let header = HeaderBar::new();
-        header.set_show_close_button(true);
-        header.set_title(Some(crate::APP_NAME));
+        let title = Label::new(Some(crate::APP_NAME));
+        title.add_css_class("brand-title");
+        header.set_title_widget(Some(&title));
         window.set_titlebar(Some(&header));
 
-        let btn_grab = Button::new();
-        let icon = Image::from_icon_name(Some("color-picker"), gtk::IconSize::Button);
-        btn_grab.add(&icon);
-        btn_grab.set_tooltip_text(Some("Capture color"));
+        let btn_grab = Button::with_label("Capture color");
+        btn_grab.add_css_class("capture");
         header.pack_start(&btn_grab);
-        let btn_settings = Button::from_icon_name(Some("preferences-system-symbolic"), gtk::IconSize::Button);
+        let btn_settings = Button::from_icon_name("preferences-system-symbolic");
         btn_settings.set_tooltip_text(Some("Settings"));
         header.pack_end(&btn_settings);
 
-        // Colors setup from theme
-        let style_ctx = window.style_context();
-        let fg_col = style_ctx.color(StateFlags::NORMAL);
-        let highlight_hex = format!(
-            "#{:02x}{:02x}{:02x}",
-            (fg_col.red() * 255.0) as u8,
-            (fg_col.green() * 255.0) as u8,
-            (fg_col.blue() * 255.0) as u8
-        );
-        let lowlight_hex = "#888888".to_string();
-
-        let avg_highlight = (fg_col.red() + fg_col.green() + fg_col.blue()) / 3.0;
-        let row_bg_col = if avg_highlight > 0.5 {
-            "rgba(0, 0, 0, 0.6)"
-        } else {
-            "rgba(255, 255, 255, 0.6)"
-        };
-
-        // CSS
-        let css = format!(
-            r#"
-            label {{ transition: 250ms ease-in-out; }}
-            label.highlighted {{ background-color: rgba(255, 255, 0, 0.4); }}
-            #empty-heading {{ font-size: 200%; }}
-            frame {{
-                background-color: {row_bg_col};
-            }}
-            eventbox frame {{
-                border-width: 0 0 1px 0;
-                padding: 6px 0;
-            }}
-            "#
-        );
-        let css_provider = CssProvider::new();
-        let _ = css_provider.load_from_data(css.as_bytes());
-        gtk::StyleContext::add_provider_for_screen(
-            &gdk::Screen::default().expect("Default screen"),
-            &css_provider,
+        let css = CssProvider::new();
+        css.load_from_data(include_str!("style.css"));
+        gtk::style_context_add_provider_for_display(
+            &gtk::prelude::WidgetExt::display(&window),
+            &css,
             STYLE_PROVIDER_PRIORITY_APPLICATION,
         );
+        let highlight_hex = "#f7efff".to_string();
+        let lowlight_hex = "#bfb1cd".to_string();
 
-        // Main Box
-        let main_vb = gtk::Box::new(Orientation::Vertical, 0);
+        let main_vb = gtk::Box::new(Orientation::Vertical, 14);
+        main_vb.set_margin_top(18);
+        main_vb.set_margin_bottom(18);
+        main_vb.set_margin_start(18);
+        main_vb.set_margin_end(18);
 
-        // Format Selector
-        let hb_format = gtk::Box::new(Orientation::Horizontal, 12);
-        let lbl_format = Label::new(Some("Format:"));
-        hb_format.pack_start(&lbl_format, false, false, 12);
-
-        let format_store = ListStore::new(&[glib::Type::STRING]);
-        for &fmt in FORMAT_NAMES {
-            format_store.set(&format_store.append(), &[(0, &fmt)]);
+        let toolbar = gtk::Box::new(Orientation::Horizontal, 10);
+        toolbar.append(&Label::new(Some("Color format")));
+        let format_combo = ComboBoxText::new();
+        for &format in FORMAT_NAMES {
+            format_combo.append(Some(format), format);
         }
-        let format_combo = ComboBox::with_model(&format_store);
-        let renderer = CellRendererText::new();
-        format_combo.pack_start(&renderer, true);
-        format_combo.add_attribute(&renderer, "text", 0);
-        hb_format.pack_start(&format_combo, false, false, 12);
-        main_vb.pack_start(&hb_format, false, false, 12);
-
-        // History container
-        let hb_history = gtk::Box::new(Orientation::Horizontal, 0);
-        let history_frame = Frame::new(None);
-        let container_vb = gtk::Box::new(Orientation::Vertical, 0);
-        let history_scroll = gtk::ScrolledWindow::new(None::<&gtk::Adjustment>, None::<&gtk::Adjustment>);
-        history_scroll.set_policy(gtk::PolicyType::Never, gtk::PolicyType::Automatic);
-        history_scroll.set_min_content_height(130);
-        history_scroll.add(&container_vb);
-        history_frame.add(&history_scroll);
-        hb_history.pack_start(&history_frame, true, true, 12);
-        main_vb.pack_start(&hb_history, true, true, 0);
-
-        // Bottom bar: Clear history
-        let hb_bottom = gtk::Box::new(Orientation::Horizontal, 0);
+        toolbar.append(&format_combo);
         let btn_clear = Button::with_label("Clear history");
         btn_clear.set_sensitive(false);
-        hb_bottom.pack_end(&btn_clear, false, false, 12);
-        main_vb.pack_end(&hb_bottom, false, false, 12);
+        btn_clear.set_hexpand(true);
+        btn_clear.set_halign(Align::End);
+        toolbar.append(&btn_clear);
+        main_vb.append(&toolbar);
 
-        // Empty state
-        let empty_box = empty_state::build_empty_state();
+        let container_vb = gtk::Box::new(Orientation::Vertical, 8);
+        let history_scroll = gtk::ScrolledWindow::new();
+        history_scroll.set_policy(gtk::PolicyType::Never, gtk::PolicyType::Automatic);
+        history_scroll.set_min_content_height(130);
+        history_scroll.set_vexpand(true);
+        history_scroll.set_child(Some(&container_vb));
+        main_vb.append(&history_scroll);
+
+        let empty_box = empty_state::build_empty_state(&btn_grab);
         let history_stack = gtk::Stack::new();
-        history_stack.add_named(&empty_box, "empty");
-        history_stack.add_named(&main_vb, "history");
+        history_stack.add_named(&empty_box, Some("empty"));
+        history_stack.add_named(&main_vb, Some("history"));
         let tabs = gtk::Notebook::new();
         tabs.set_scrollable(true);
         tabs.append_page(&history_stack, Some(&Label::new(Some("History"))));
-        window.add(&tabs);
+        window.set_child(Some(&tabs));
 
         let initial_state = load_state();
 
@@ -175,19 +130,7 @@ impl MainWindow {
             btn_clear: btn_clear.clone(),
             highlight_hex,
             lowlight_hex,
-            window_metrics_restored: false,
-            resize_timeout_id: None,
         }));
-
-        {
-            let inner = inner.clone();
-            let window = window.downgrade();
-            btn_settings.connect_clicked(move |_| {
-                if let Some(window) = window.upgrade() {
-                    settings::show(&window, &inner);
-                }
-            });
-        }
 
         let palette_editor = studio::add_pages(&tabs, &window, &inner);
         inner.borrow_mut().palette_editor = Rc::downgrade(&palette_editor);
@@ -206,23 +149,18 @@ impl MainWindow {
         {
             let inner_clone = inner.clone();
             format_combo.connect_changed(move |cb| {
-                if let Some(iter) = cb.active_iter() {
-                    let model = cb.model().expect("ComboBox model");
-                    let val = model.value(&iter, 0);
-                    if let Ok(fmt_str) = val.get::<&str>() {
-                        let mut inner_borrow = inner_clone.borrow_mut();
-                        inner_borrow.state.formatter = fmt_str.to_string();
-                        let active_fmt = inner_borrow.state.formatter.clone();
-                        let hi = inner_borrow.highlight_hex.clone();
-                        let lo = inner_borrow.lowlight_hex.clone();
-
-                        for card in &inner_borrow.cards {
-                            let formatted = format_color(&active_fmt, card.r, card.g, card.b, &card.name);
-                            card.update_formatted(&formatted, &hi, &lo);
-                        }
-
-                        persist(&inner_borrow.state);
+                if let Some(format) = cb.active_id() {
+                    let mut inner = inner_clone.borrow_mut();
+                    inner.state.formatter = format.to_string();
+                    for card in &inner.cards {
+                        let formatted = format_color(&format, card.r, card.g, card.b, &card.name);
+                        card.update_formatted(
+                            &formatted,
+                            &inner.highlight_hex,
+                            &inner.lowlight_hex,
+                        );
                     }
+                    persist(&inner.state);
                 }
             });
         }
@@ -235,7 +173,7 @@ impl MainWindow {
                 inner_borrow.state.colours.clear();
                 inner_borrow.cards.clear();
 
-                for child in inner_borrow.container_vb.children() {
+                while let Some(child) = inner_borrow.container_vb.first_child() {
                     inner_borrow.container_vb.remove(&child);
                 }
 
@@ -244,22 +182,6 @@ impl MainWindow {
                 persist(&inner_borrow.state);
             });
         }
-
-        // Window events
-        window.add_events(EventMask::KEY_PRESS_MASK | EventMask::ENTER_NOTIFY_MASK);
-
-        // Ensure default pointer cursor is immediately restored when mouse enters the app window
-        window.connect_enter_notify_event(|w, _| {
-            if let Some(gw) = w.window() {
-                if let Some(display) = gdk::Display::default() {
-                    let arrow = gdk::Cursor::from_name(&display, "default");
-                    gw.set_cursor(arrow.as_ref());
-                } else {
-                    gw.set_cursor(None);
-                }
-            }
-            glib::Propagation::Proceed
-        });
 
         // Pick state tracking
         let is_picking = Rc::new(RefCell::new(false));
@@ -279,42 +201,18 @@ impl MainWindow {
                     btn.set_sensitive(false);
                 }
 
-                let (screen, monitor_idx, geom) = {
-                    let scr = gdk::Screen::default().expect("Default screen");
-                    let display = scr.display();
-                    let seat = display.default_seat();
-                    let pointer = seat.and_then(|s| s.pointer());
-                    let mon = if let Some(ptr) = pointer {
-                        let (_, px, py) = ptr.position();
-                        display.monitor_at_point(px, py).unwrap_or_else(|| display.monitor(0).unwrap())
-                    } else if let Some(win) = win_weak.upgrade() {
-                        if let Some(gw) = win.window() {
-                            display.monitor_at_window(&gw).unwrap_or_else(|| display.monitor(0).unwrap())
-                        } else {
-                            display.monitor(0).unwrap()
-                        }
-                    } else {
-                        display.monitor(0).unwrap()
-                    };
+                let monitor = win_weak.upgrade().and_then(|window| {
+                    let monitor = capture_monitor(&window);
+                    window.hide();
+                    gtk::prelude::WidgetExt::display(&window).sync();
+                    monitor
+                });
 
-                    let mut idx = 0;
-                    for i in 0..display.n_monitors() {
-                        if let Some(m) = display.monitor(i) {
-                            if m == mon {
-                                idx = i;
-                                break;
-                            }
-                        }
-                    }
-                    (scr, idx, mon.geometry())
-                };
-
-                if let Some(win) = win_weak.upgrade() {
-                    win.hide();
-                    screen.display().sync();
-                }
-
-                let screenshot_opt = capture::capture_fullscreen();
+                let screenshot = monitor.and_then(|monitor| {
+                    let screenshot = capture::capture_fullscreen()?;
+                    let screenshot = crop_monitor(&screenshot, &monitor)?;
+                    Some((screenshot, monitor))
+                });
 
                 let is_picking_end = is_picking_clone.clone();
                 let btn_grab_end = btn_grab_weak.clone();
@@ -326,37 +224,27 @@ impl MainWindow {
                     }
                     if let Some(win) = win_end.upgrade() {
                         win.present();
-                        if let Some(gw) = win.window() {
-                            if let Some(display) = gdk::Display::default() {
-                                let arrow = gdk::Cursor::from_name(&display, "default");
-                                gw.set_cursor(arrow.as_ref());
-                            } else {
-                                gw.set_cursor(None);
-                            }
-                        }
                     }
                 };
 
-                if let Some(full_screenshot) = screenshot_opt {
+                if let Some((monitor_screenshot, monitor)) = screenshot {
                     let inner_c = inner_clone.clone();
-                    let fmt = inner_clone.borrow().state.formatter.clone();
-
-                    // Crop to the active monitor geometry (resolves multi-monitor offset and "below the screen" issues)
-                    let crop_x = geom.x().clamp(0, full_screenshot.width() - 1);
-                    let crop_y = geom.y().clamp(0, full_screenshot.height() - 1);
-                    let crop_w = geom.width().min(full_screenshot.width() - crop_x);
-                    let crop_h = geom.height().min(full_screenshot.height() - crop_y);
-
-                    let monitor_screenshot = full_screenshot.new_subpixbuf(crop_x, crop_y, crop_w, crop_h);
+                    let (fmt, zoom_range) = {
+                        let inner = inner_clone.borrow();
+                        (
+                            inner.state.formatter.clone(),
+                            inner.state.settings.zoom_range(),
+                        )
+                    };
 
                     let reset_picker_1 = reset_picker.clone();
                     let reset_picker_2 = reset_picker;
 
                     MagnifierOverlay::start(
                         monitor_screenshot,
-                        &screen,
-                        monitor_idx,
+                        &monitor,
                         fmt,
+                        zoom_range,
                         snark_mode,
                         token,
                         move |r, g, b, crop| {
@@ -382,6 +270,20 @@ impl MainWindow {
             })
         };
 
+        let grab_fn: Rc<dyn Fn(Option<String>)> = grab_fn;
+        let shortcut = Rc::new(shortcuts::GlobalShortcut::new(Rc::downgrade(&grab_fn)));
+        shortcut.set_enabled(inner.borrow().state.settings.global_shortcut);
+        {
+            let inner = inner.clone();
+            let window = window.downgrade();
+            let shortcut = shortcut.clone();
+            btn_settings.connect_clicked(move |_| {
+                if let Some(window) = window.upgrade() {
+                    settings::show(&window, &inner, &shortcut);
+                }
+            });
+        }
+
         // Connect Grab button
         {
             let grab_fn_clone = grab_fn.clone();
@@ -390,56 +292,11 @@ impl MainWindow {
             });
         }
 
-        // Configure event (Debounced window metrics save)
-        {
-            let inner_clone = inner.clone();
-            window.connect_configure_event(move |win, ev| {
-                let mut inner_borrow = inner_clone.borrow_mut();
-                if !inner_borrow.window_metrics_restored {
-                    return false;
-                }
-
-                if let Some(source_id) = inner_borrow.resize_timeout_id.take() {
-                    source_id.remove();
-                }
-
-                let (x, y) = ev.position();
-                let (w, h) = ev.size();
-                let inner_weak = Rc::downgrade(&inner_clone);
-                let win_weak = win.downgrade();
-
-                let source_id = glib::timeout_add_seconds_local(1, move || {
-                    if let (Some(inner_rc), Some(wnd)) = (inner_weak.upgrade(), win_weak.upgrade()) {
-                        if let Some(screen) = gtk::prelude::GtkWindowExt::screen(&wnd) {
-                            if let Some(root) = screen.root_window() {
-                                let sw = root.width() as f64;
-                                let sh = root.height() as f64;
-                                let mut inner_b = inner_rc.borrow_mut();
-                                inner_b.state.metrics = Some(WindowMetrics {
-                                    ww: Some(w as f64 / sw),
-                                    wh: Some(h as f64 / sh),
-                                    wx: Some(x as f64 / sw),
-                                    wy: Some(y as f64 / sh),
-                                });
-                                persist(&inner_b.state);
-                                inner_b.resize_timeout_id = None;
-                            }
-                        }
-                    }
-                    glib::ControlFlow::Break
-                });
-                inner_borrow.resize_timeout_id = Some(source_id);
-
-                false
-            });
-        }
-
         // Load existing history
         {
             let mut inner_borrow = inner.borrow_mut();
             let history_items = inner_borrow.state.colours.clone();
 
-            inner_borrow.history_stack.show_all();
             if history_items.is_empty() {
                 inner_borrow.history_stack.set_visible_child_name("empty");
             } else {
@@ -457,35 +314,21 @@ impl MainWindow {
                 inner_borrow.btn_clear.set_sensitive(true);
             }
 
-            // Restore metrics
             if let Some(metrics) = &inner_borrow.state.metrics {
-                if let (Some(wx_val), Some(wy_val), Some(ww_val), Some(wh_val)) = (metrics.wx, metrics.wy, metrics.ww, metrics.wh) {
-                    if let Some(screen) = gtk::prelude::GtkWindowExt::screen(&window) {
-                        if let Some(root) = screen.root_window() {
-                            let sw = root.width() as f64;
-                            let sh = root.height() as f64;
-                            let wx = (sw * wx_val) as i32;
-                            let wy = (sh * wy_val) as i32;
-                            let ww = (sw * ww_val) as i32;
-                            let wh = (sh * wh_val) as i32;
-
-                            let win_weak = window.downgrade();
-                            glib::timeout_add_local(std::time::Duration::from_millis(50), move || {
-                                if let Some(win) = win_weak.upgrade() {
-                                    win.move_(wx, wy);
-                                    win.resize(ww, wh);
-                                }
-                                glib::ControlFlow::Break
-                            });
-                        }
-                    }
+                if let (Some(width), Some(height), Some(bounds)) = (
+                    metrics.ww,
+                    metrics.wh,
+                    display_bounds(&gtk::prelude::WidgetExt::display(&window)),
+                ) {
+                    window.set_default_size(
+                        (f64::from(bounds.2) * width) as i32,
+                        (f64::from(bounds.3) * height) as i32,
+                    );
                 }
             }
-            inner_borrow.window_metrics_restored = true;
         }
 
-        #[allow(deprecated)]
-        let (tray_tx, tray_rx) = glib::MainContext::channel::<tray::TrayCommand>(glib::Priority::default());
+        let (tray_tx, tray_rx) = async_channel::unbounded();
         let tray_handle = tray::spawn_tray(tray_tx);
 
         {
@@ -493,7 +336,21 @@ impl MainWindow {
             let can_hide = tray_handle.is_some();
             let app = app.downgrade();
             let hold = RefCell::new(None);
-            window.connect_delete_event(move |win, _| {
+            window.connect_close_request(move |win| {
+                if let Some((_, _, width, height)) =
+                    display_bounds(&gtk::prelude::WidgetExt::display(win))
+                {
+                    let mut inner = inner.borrow_mut();
+                    let metrics = inner.state.metrics.get_or_insert(WindowMetrics {
+                        ww: None,
+                        wh: None,
+                        wx: None,
+                        wy: None,
+                    });
+                    metrics.ww = Some(f64::from(win.width()) / f64::from(width));
+                    metrics.wh = Some(f64::from(win.height()) / f64::from(height));
+                    persist(&inner.state);
+                }
                 if can_hide && (force_background || inner.borrow().state.settings.background) {
                     if let Some(app) = app.upgrade() {
                         hold.borrow_mut().get_or_insert_with(|| app.hold());
@@ -511,43 +368,42 @@ impl MainWindow {
             let grab_fn_tray = grab_fn.clone();
             let win_weak_tray = window.downgrade();
             let app_weak_tray = app.downgrade();
-            tray_rx.attach(None, move |cmd| {
-                match cmd {
-                    tray::TrayCommand::PickColor(token) => {
-                        grab_fn_tray(token);
-                    }
-                    tray::TrayCommand::ShowWindow(token) => {
-                        if let Some(win) = win_weak_tray.upgrade() {
-                            if let Some(tok) = token.as_deref() {
-                                win.set_startup_id(tok);
+            glib::MainContext::default().spawn_local(async move {
+                while let Ok(cmd) = tray_rx.recv().await {
+                    match cmd {
+                        tray::TrayCommand::PickColor(token) => {
+                            grab_fn_tray(token);
+                        }
+                        tray::TrayCommand::ShowWindow(token) => {
+                            if let Some(win) = win_weak_tray.upgrade() {
+                                if let Some(tok) = token.as_deref() {
+                                    win.set_startup_id(tok);
+                                }
+                                win.present();
                             }
-                            win.show_all();
-                            win.present();
                         }
-                    }
-                    tray::TrayCommand::ShowAbout => {
-                        if let Some(win) = win_weak_tray.upgrade() {
-                            about::show_about_dialog(Some(win.upcast_ref::<gtk::Window>()));
+                        tray::TrayCommand::ShowAbout => {
+                            if let Some(win) = win_weak_tray.upgrade() {
+                                about::show_about_dialog(Some(win.upcast_ref::<gtk::Window>()));
+                            }
                         }
-                    }
-                    tray::TrayCommand::Quit => {
-                        if let Some(app) = app_weak_tray.upgrade() {
-                            app.quit();
-                        } else {
-                            std::process::exit(0);
+                        tray::TrayCommand::Quit => {
+                            if let Some(app) = app_weak_tray.upgrade() {
+                                app.quit();
+                            } else {
+                                std::process::exit(0);
+                            }
                         }
                     }
                 }
-                glib::ControlFlow::Continue
             });
         }
-
-        window.show_all();
 
         MainWindow {
             window,
             _tray_handle: tray_handle,
             grab: grab_fn,
+            _shortcut: shortcut,
         }
     }
 
@@ -557,7 +413,10 @@ impl MainWindow {
         thumbnail: Option<Pixbuf>,
     ) {
         let mut inner = inner.borrow_mut();
-        let image = thumbnail.as_ref().and_then(capture::pixbuf_to_base64_png).unwrap_or_default();
+        let image = thumbnail
+            .as_ref()
+            .and_then(capture::pixbuf_to_base64_png)
+            .unwrap_or_default();
         Self::add_color_item(&mut inner, r, g, b, &image, thumbnail);
         persist(&inner.state);
 
@@ -576,21 +435,18 @@ impl MainWindow {
             }
         }
         if inner.sound.get() {
-            crate::audio::play_sound("camera-shutter");
+            crate::audio::Feedback::Capture.play();
         }
     }
 
-    fn add_color_item_view(
-        inner: &mut AppInner,
-        r: u8,
-        g: u8,
-        b: u8,
-        pixbuf: Option<Pixbuf>,
-    ) {
+    fn add_color_item_view(inner: &mut AppInner, r: u8, g: u8, b: u8, pixbuf: Option<Pixbuf>) {
         let col_name = inner.color_db.closest_name(r, g, b);
         let formatted = format_color(&inner.state.formatter, r, g, b, col_name);
         let palette_editor = inner.palette_editor.clone();
-        let swatch = crate::color::studio::Swatch { name: col_name.to_owned(), rgb: [r, g, b] };
+        let swatch = crate::color::studio::Swatch {
+            name: col_name.to_owned(),
+            rgb: [r, g, b],
+        };
         let card = ColorCard::new(
             r,
             g,
@@ -610,11 +466,9 @@ impl MainWindow {
 
         let revealer = Revealer::new();
         revealer.set_transition_type(RevealerTransitionType::SlideDown);
-        revealer.add(&card.container);
+        revealer.set_child(Some(&card.container));
 
-        inner.container_vb.pack_start(&revealer, false, false, 0);
-        inner.container_vb.reorder_child(&revealer, 0);
-        revealer.show_all();
+        inner.container_vb.prepend(&revealer);
         revealer.set_reveal_child(true);
 
         inner.cards.push(card);
@@ -650,4 +504,83 @@ fn persist(state: &AppState) {
     if let Err(error) = save_state(state) {
         eprintln!("Could not save Luti Color Picker data: {error}");
     }
+}
+
+fn monitors(display: &gdk::Display) -> impl Iterator<Item = gdk::Monitor> {
+    let model = display.monitors();
+    (0..model.n_items()).filter_map(move |index| model.item(index)?.downcast().ok())
+}
+
+fn display_bounds(display: &gdk::Display) -> Option<(i32, i32, i32, i32)> {
+    let geometries: Vec<_> = monitors(display)
+        .map(|monitor| monitor.geometry())
+        .collect();
+    let left = geometries.iter().map(|rect| rect.x()).min()?;
+    let top = geometries.iter().map(|rect| rect.y()).min()?;
+    let right = geometries
+        .iter()
+        .map(|rect| rect.x() + rect.width())
+        .max()?;
+    let bottom = geometries
+        .iter()
+        .map(|rect| rect.y() + rect.height())
+        .max()?;
+    Some((left, top, right - left, bottom - top))
+}
+
+fn capture_monitor(window: &ApplicationWindow) -> Option<gdk::Monitor> {
+    let display = gtk::prelude::WidgetExt::display(window);
+    if !capture::is_wayland() {
+        if let Some((x, y)) = capture::x11_pointer() {
+            if let Some((left, top, _, _)) = display_bounds(&display) {
+                if let Some(monitor) = monitors(&display).find(|monitor| {
+                    let geometry = monitor.geometry();
+                    let scale = monitor.scale_factor();
+                    let x = x / scale + left;
+                    let y = y / scale + top;
+                    x >= geometry.x()
+                        && x < geometry.x() + geometry.width()
+                        && y >= geometry.y()
+                        && y < geometry.y() + geometry.height()
+                }) {
+                    return Some(monitor);
+                }
+            }
+        }
+    }
+    let pointer_surface = display
+        .default_seat()
+        .and_then(|seat| seat.pointer())
+        .and_then(|pointer| pointer.surface_at_position().0);
+    pointer_surface
+        .or_else(|| window.surface())
+        .and_then(|surface| display.monitor_at_surface(&surface))
+        .or_else(|| monitors(&display).next())
+}
+
+fn crop_monitor(screenshot: &Pixbuf, monitor: &gdk::Monitor) -> Option<Pixbuf> {
+    let (left, top, width, height) = display_bounds(&monitor.display())?;
+    let geometry = monitor.geometry();
+    let scale_x = f64::from(screenshot.width()) / f64::from(width);
+    let scale_y = f64::from(screenshot.height()) / f64::from(height);
+    let x = (f64::from(geometry.x() - left) * scale_x).round() as i32;
+    let y = (f64::from(geometry.y() - top) * scale_y).round() as i32;
+    let right = x + (f64::from(geometry.width()) * scale_x).round() as i32;
+    let bottom = y + (f64::from(geometry.height()) * scale_y).round() as i32;
+    let width = right.min(screenshot.width()) - x;
+    let height = bottom.min(screenshot.height()) - y;
+    (width > 0 && height > 0).then(|| screenshot.new_subpixbuf(x, y, width, height))
+}
+
+fn brand_icon(size: i32) -> Image {
+    let stream = gio::MemoryInputStream::from_bytes(&glib::Bytes::from_static(include_bytes!(
+        "../../packaging/io.github.eulucastiagolt.LutiColorPicker.png"
+    )));
+    let icon = match Pixbuf::from_stream_at_scale(&stream, size, size, true, gio::Cancellable::NONE)
+    {
+        Ok(pixbuf) => Image::from_paintable(Some(&gdk::Texture::for_pixbuf(&pixbuf))),
+        Err(_) => Image::from_icon_name(crate::APP_ID),
+    };
+    icon.set_pixel_size(size);
+    icon
 }
