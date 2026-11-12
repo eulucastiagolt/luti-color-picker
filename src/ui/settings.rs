@@ -1,4 +1,4 @@
-use super::{about, shortcuts, AppInner};
+use super::{about, shortcuts, window_header, AppInner};
 use crate::autostart;
 use crate::storage::{save_state, Settings, MAX_ZOOM, MIN_ZOOM};
 use gtk::prelude::*;
@@ -14,8 +14,9 @@ pub(super) fn show(
     inner: &Rc<RefCell<AppInner>>,
     shortcut: &Rc<shortcuts::GlobalShortcut>,
 ) {
+    let title = "Settings";
     let dialog = Dialog::with_buttons(
-        Some("Settings"),
+        Some(title),
         Some(window),
         DialogFlags::MODAL | DialogFlags::DESTROY_WITH_PARENT,
         &[
@@ -25,6 +26,7 @@ pub(super) fn show(
         ],
     );
     dialog.add_css_class("luti");
+    dialog.set_titlebar(Some(&window_header(title)));
     dialog.set_default_response(ResponseType::Apply);
 
     let current = inner.borrow().state.settings.clone();

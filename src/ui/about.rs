@@ -5,13 +5,15 @@ use gtk::{
 };
 
 pub fn show_about_dialog(parent: Option<&Window>) {
+    let title = format!("About {}", crate::APP_NAME);
     let dialog = Dialog::with_buttons(
-        Some(&format!("About {}", crate::APP_NAME)),
+        Some(&title),
         parent,
         DialogFlags::MODAL | DialogFlags::DESTROY_WITH_PARENT,
         &[("Close", ResponseType::Close)],
     );
     dialog.add_css_class("luti");
+    dialog.set_titlebar(Some(&super::window_header(&title)));
     dialog.set_default_size(360, -1);
     let tabs = Notebook::new();
     dialog.content_area().append(&tabs);

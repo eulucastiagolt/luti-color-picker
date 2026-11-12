@@ -73,8 +73,22 @@ fn swatch(rgb: Rgb) -> DrawingArea {
 }
 
 fn color_button(rgb: Rgb) -> ColorButton {
+    ColorButton::with_rgba(&rgba(rgb))
+}
+
+fn rgba(rgb: Rgb) -> gdk::RGBA {
     let [r, g, b] = fractions(rgb);
-    ColorButton::with_rgba(&gdk::RGBA::new(r as f32, g as f32, b as f32, 1.0))
+    gdk::RGBA::new(r as f32, g as f32, b as f32, 1.0)
+}
+
+fn parse_hex_color(text: &str) -> Option<Rgb> {
+    let text = text.trim();
+    let digits = text.strip_prefix('#').unwrap_or(text);
+    if digits.len() != 6 || !digits.bytes().all(|digit| digit.is_ascii_hexdigit()) {
+        return None;
+    }
+    let [_, r, g, b] = u32::from_str_radix(digits, 16).ok()?.to_be_bytes();
+    Some([r, g, b])
 }
 
 fn selected_rgb(button: &ColorButton) -> Rgb {
@@ -556,9 +570,14 @@ impl GradientEditor {
             let picker = color_button(stop.rgb);
             picker.set_title("Stop color");
             row.append(&picker);
-            let value = label(&hex(stop.rgb));
-            value.set_hexpand(true);
+            let value = Entry::new();
+            value.set_text(&hex(stop.rgb));
+            value.set_width_chars(8);
+            value.set_tooltip_text(Some("Enter a six-digit HEX color, such as #23C7B2"));
             row.append(&value);
+            let spacer = GtkBox::new(Orientation::Horizontal, 0);
+            spacer.set_hexpand(true);
+            row.append(&spacer);
             let position = SpinButton::with_range(0.0, 100.0, 1.0);
             position.set_value(f64::from(stop.percent));
             position.set_tooltip_text(Some("Stop position (%)"));
@@ -568,10 +587,25 @@ impl GradientEditor {
             remove.set_sensitive(removable);
             row.append(&remove);
             let editor = self.clone();
+            let entry = value.downgrade();
             picker.connect_color_set(move |picker| {
                 let rgb = selected_rgb(picker);
-                value.set_text(&hex(rgb));
+                if let Some(entry) = entry.upgrade() {
+                    entry.set_text(&hex(rgb));
+                }
                 editor.edit(|gradient| gradient.stops[index].rgb = rgb);
+            });
+            let editor = self.clone();
+            value.connect_changed(move |entry| {
+                let Some(rgb) = parse_hex_color(&entry.text()) else {
+                    entry.add_css_class("error");
+                    return;
+                };
+                entry.remove_css_class("error");
+                if selected_rgb(&picker) != rgb {
+                    picker.set_rgba(&rgba(rgb));
+                    editor.edit(|gradient| gradient.stops[index].rgb = rgb);
+                }
             });
             let editor = self.clone();
             position.connect_value_changed(move |position| {

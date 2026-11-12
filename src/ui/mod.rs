@@ -57,10 +57,7 @@ impl MainWindow {
         window.set_size_request(460, 440);
         window.set_default_size(620, 620);
 
-        let header = HeaderBar::new();
-        let title = Label::new(Some(crate::APP_NAME));
-        title.add_css_class("brand-title");
-        header.set_title_widget(Some(&title));
+        let header = window_header(crate::APP_NAME);
         window.set_titlebar(Some(&header));
 
         let btn_grab = Button::with_label("Capture color");
@@ -201,8 +198,13 @@ impl MainWindow {
                     btn.set_sensitive(false);
                 }
 
+                let mut dialogs = Vec::new();
                 let monitor = win_weak.upgrade().and_then(|window| {
                     let monitor = capture_monitor(&window);
+                    dialogs = visible_transient_windows(window.upcast_ref());
+                    for dialog in dialogs.iter().rev() {
+                        dialog.hide();
+                    }
                     window.hide();
                     gtk::prelude::WidgetExt::display(&window).sync();
                     monitor
@@ -224,6 +226,9 @@ impl MainWindow {
                     }
                     if let Some(win) = win_end.upgrade() {
                         win.present();
+                        for dialog in &dialogs {
+                            dialog.present();
+                        }
                     }
                 };
 
@@ -498,6 +503,38 @@ impl MainWindow {
         inner.history_stack.set_visible_child_name("history");
         inner.btn_clear.set_sensitive(true);
     }
+}
+
+fn visible_transient_windows(parent: &gtk::Window) -> Vec<gtk::Window> {
+    let mut dialogs: Vec<_> = gtk::Window::list_toplevels()
+        .into_iter()
+        .filter_map(|widget| {
+            let window = widget.downcast::<gtk::Window>().ok()?;
+            if !window.is_visible() {
+                return None;
+            }
+            let mut ancestor = window.transient_for();
+            let mut depth = 1;
+            while let Some(current) = ancestor {
+                if current == *parent {
+                    return Some((depth, window));
+                }
+                depth += 1;
+                ancestor = current.transient_for();
+            }
+            None
+        })
+        .collect();
+    dialogs.sort_by_key(|(depth, _)| *depth);
+    dialogs.into_iter().map(|(_, window)| window).collect()
+}
+
+fn window_header(title: &str) -> HeaderBar {
+    let header = HeaderBar::new();
+    let title = Label::new(Some(title));
+    title.add_css_class("brand-title");
+    header.set_title_widget(Some(&title));
+    header
 }
 
 fn persist(state: &AppState) {

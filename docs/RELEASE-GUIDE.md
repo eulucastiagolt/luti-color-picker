@@ -1,4 +1,4 @@
-# Luti Color Picker 1.2.0
+# Luti Color Picker 1.3.4
 
 ## Build release packages
 
@@ -43,23 +43,20 @@ Confirm the version under **About** or by running `luti-color-picker --version`.
 Review and commit the release changes. Create an annotated tag and push it together with the release commit.
 
 ```sh
-git tag -a v1.2.0 -m "Luti Color Picker 1.2.0"
-git push origin main v1.2.0
+git tag -a v1.3.4 -m "Luti Color Picker 1.3.4"
+git push origin main v1.3.4
 ```
 
 Use the notes below for the GitHub release and attach the packages built for the tag. Upload the AppImage and its matching `.AppImage.zsync` file to the same stable release. Keep their generated filenames so AppImage managers can find the right update for the installed architecture.
 
 ## GitHub release notes
 
-Luti Color Picker 1.2.0 adds update discovery for AppImage managers and desktop notifications for new stable releases.
+Color capture now temporarily hides open dialogs and restores them when the capture ends.
 
-- The AppImage embeds the GitHub Releases update source. Compatible managers can discover a newer AppImage using the matching `.AppImage.zsync` asset.
-- The app checks GitHub at startup and every six hours while running. When it finds a newer stable version, the desktop notification opens that release on GitHub. Installation is handled by your AppImage manager or package manager.
-
-The existing capture, magnifier, palette, and gradient features are included.
+Luti Color Picker 1.3.4 styles dropdown menus to match the application theme and uses the same title bar styling in Settings, About, and the main window. The Gradients tab also supports inline HEX editing for each stop. Enter six hexadecimal digits with an optional `#` to update the preview and CSS.
 
 ### Linux downloads
 
 The x86_64 release includes AppImage, a portable `.run` launcher, Debian/Ubuntu, RPM, and Arch Linux packages. Flatpak and Snap build recipes are available in the source tree.
 
-If you currently use an AppImage from an earlier release, download the 1.2.0 AppImage once to switch to a build with embedded update information. The `.zsync` file is used by update tools. To launch the app, download the `.AppImage` file.
+If you currently use an AppImage from a release before 1.2.0, download the 1.3.4 AppImage once to switch to a build with embedded update information. The `.zsync` file is used by update tools. To launch the app, download the `.AppImage` file.
