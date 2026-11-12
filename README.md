@@ -12,7 +12,7 @@ The application requires GTK 4 and system libraries compatible with the build. O
 
 Click **Capture color**, then click the pixel you want. Scroll to zoom or press Escape or right-click to cancel. Set the magnifier's minimum and maximum zoom under **Settings**.
 
-Click a history card to copy its color in the current format. **Palette** adds the color to the palette selected under **Palettes**. To choose a destination each time, enable **Ask which palette to add history colors to** under **Settings**.
+Click a history card to open the Shades dialog. The **Copy** button on the card copies its color in the current format. In the dialog, use **Copy** or **Add to palette** on the row of the shade you want. In **Palettes**, use **Copy**, **Edit**, or **Shades** on a color to copy its HEX, edit its name and code, or open its shades. **Palette** adds the color to the palette selected under **Palettes**. To choose a destination each time, enable **Ask which palette to add history colors to** under **Settings**.
 
 - **Palettes** stores named, editable palettes. Add colors from recent captures and export to PNG, SVG, TXT, CSS variables, Tailwind CSS v3 and v4, JSON, or GPL for GIMP and Inkscape.
 - **Gradients** lets you edit colors, stop positions, and angles, copy CSS, and export PNGs.

@@ -13,20 +13,14 @@ use std::rc::Rc;
 use crate::color::formatters::format_color;
 use crate::color::ColorDatabase;
 
-pub struct OverlayState {
-    pub screenshot: Pixbuf,
-    pub mouse_pos: Option<(f64, f64)>,
-    pub zoom_level: i32,
-    pub formatter: String,
-    pub color_db: ColorDatabase,
-}
+type PickedColor = (u8, u8, u8, Pixbuf);
+type FinishCapture = Rc<dyn Fn(Option<PickedColor>)>;
 
 pub struct MagnifierOverlay;
 
 impl MagnifierOverlay {
     pub fn start<F, C>(
-        screenshot: Pixbuf,
-        monitor: &gdk::Monitor,
+        screens: Vec<(Pixbuf, gdk::Monitor)>,
         formatter: String,
         zoom_range: RangeInclusive<i32>,
         snark_mode: bool,
@@ -37,60 +31,106 @@ impl MagnifierOverlay {
         F: Fn(u8, u8, u8, Pixbuf) + 'static,
         C: Fn() + 'static,
     {
-        let window = Window::new();
-        if let Some(token) = activation_token.as_deref() {
-            window.set_startup_id(token);
+        let windows = Rc::new(RefCell::new(Vec::<glib::WeakRef<Window>>::new()));
+        let finish: FinishCapture = {
+            let windows = windows.clone();
+            let finished = Cell::new(false);
+            Rc::new(move |color| {
+                if finished.replace(true) {
+                    return;
+                }
+                for window in windows.borrow().iter().filter_map(glib::WeakRef::upgrade) {
+                    window.destroy();
+                }
+                if let Some((r, g, b, crop)) = color {
+                    on_pick(r, g, b, crop);
+                } else {
+                    on_cancel();
+                }
+            })
+        };
+        let zoom = Rc::new(Cell::new(3.clamp(*zoom_range.start(), *zoom_range.end())));
+        let formatter: Rc<str> = formatter.into();
+        let color_db = Rc::new(RefCell::new(ColorDatabase::new(snark_mode)));
+        let overlays: Vec<_> = screens
+            .into_iter()
+            .map(|(screenshot, monitor)| {
+                let window = Self::build_window(
+                    screenshot,
+                    formatter.clone(),
+                    color_db.clone(),
+                    zoom.clone(),
+                    zoom_range.clone(),
+                    finish.clone(),
+                );
+                window.fullscreen_on_monitor(&monitor);
+                windows.borrow_mut().push(window.downgrade());
+                window
+            })
+            .collect();
+        if let (Some(window), Some(token)) = (overlays.last(), activation_token) {
+            window.set_startup_id(&token);
         }
+        for window in overlays {
+            window.present();
+        }
+    }
+
+    fn build_window(
+        screenshot: Pixbuf,
+        formatter: Rc<str>,
+        color_db: Rc<RefCell<ColorDatabase>>,
+        zoom: Rc<Cell<i32>>,
+        zoom_range: RangeInclusive<i32>,
+        finish: FinishCapture,
+    ) -> Window {
+        let window = Window::new();
         window.set_title(Some(crate::APP_NAME));
         window.set_decorated(false);
         window.set_cursor_from_name(Some("none"));
-        window.fullscreen_on_monitor(monitor);
-        let state = Rc::new(RefCell::new(OverlayState {
-            screenshot,
-            mouse_pos: None,
-            zoom_level: 3.clamp(*zoom_range.start(), *zoom_range.end()),
-            formatter,
-            color_db: ColorDatabase::new(snark_mode),
-        }));
+        let mouse_pos = Rc::new(Cell::new(None));
 
         let drawing_area = DrawingArea::new();
         window.set_child(Some(&drawing_area));
 
         // Draw event
         {
-            let state_clone = state.clone();
+            let screenshot = screenshot.clone();
+            let mouse_pos = mouse_pos.clone();
+            let zoom = zoom.clone();
+            let first_draw = Cell::new(true);
             drawing_area.set_draw_func(move |area, ctx, width, height| {
-                let mut st = state_clone.borrow_mut();
                 ctx.scale(
-                    f64::from(width) / f64::from(st.screenshot.width()),
-                    f64::from(height) / f64::from(st.screenshot.height()),
+                    f64::from(width) / f64::from(screenshot.width()),
+                    f64::from(height) / f64::from(screenshot.height()),
                 );
-                let zoom = st.zoom_level as f64;
+                let zoom = f64::from(zoom.get());
                 let radius = 70.0; // 140px diameter loupe
 
                 // 1. Paint background screenshot 1:1 on the monitor
-                ctx.set_source_pixbuf(&st.screenshot, 0.0, 0.0);
+                ctx.set_source_pixbuf(&screenshot, 0.0, 0.0);
                 let _ = ctx.paint();
 
-                if st.mouse_pos.is_none() {
-                    st.mouse_pos = area.native().and_then(|native| {
+                if first_draw.replace(false) && mouse_pos.get().is_none() {
+                    mouse_pos.set(area.native().and_then(|native| {
                         let surface = native.surface()?;
                         let pointer = surface.display().default_seat()?.pointer()?;
                         let (x, y, _) = surface.device_position(&pointer)?;
-                        Some((x, y))
-                    });
+                        (x >= 0.0 && y >= 0.0 && x < f64::from(width) && y < f64::from(height))
+                            .then_some((x, y))
+                    }));
                 }
-                let Some((x, y)) = st.mouse_pos else {
+                let Some((x, y)) = mouse_pos.get() else {
                     return;
                 };
-                let (mx, my) = screenshot_position(&st.screenshot, area, x, y);
+                let (mx, my) = screenshot_position(&screenshot, area, x, y);
 
                 // 2. Extract current pixel RGB
-                let px = (mx as i32).clamp(0, st.screenshot.width() - 1);
-                let py = (my as i32).clamp(0, st.screenshot.height() - 1);
-                let n_channels = st.screenshot.n_channels();
-                let rowstride = st.screenshot.rowstride();
-                let pixels = unsafe { st.screenshot.pixels() };
+                let px = (mx as i32).clamp(0, screenshot.width() - 1);
+                let py = (my as i32).clamp(0, screenshot.height() - 1);
+                let n_channels = screenshot.n_channels();
+                let rowstride = screenshot.rowstride();
+                let pixels = unsafe { screenshot.pixels() };
                 let offset = (rowstride * py + px * n_channels) as usize;
 
                 let (r, g, b) = if offset + 2 < pixels.len() {
@@ -99,8 +139,9 @@ impl MagnifierOverlay {
                     (0, 0, 0)
                 };
 
-                let col_name = st.color_db.closest_name(r, g, b);
-                let formatted_text = format_color(&st.formatter, r, g, b, col_name);
+                let mut color_db = color_db.borrow_mut();
+                let col_name = color_db.closest_name(r, g, b);
+                let formatted_text = format_color(&formatter, r, g, b, col_name);
 
                 // 3. Draw circular loupe with nearest-neighbor zoom
                 let _ = ctx.save();
@@ -111,7 +152,7 @@ impl MagnifierOverlay {
                 ctx.scale(zoom, zoom);
                 ctx.translate(-mx, -my);
 
-                ctx.set_source_pixbuf(&st.screenshot, 0.0, 0.0);
+                ctx.set_source_pixbuf(&screenshot, 0.0, 0.0);
                 let pattern = ctx.source();
                 pattern.set_filter(cairo::Filter::Nearest);
                 let _ = ctx.paint();
@@ -151,7 +192,7 @@ impl MagnifierOverlay {
                 // 6. Draw color badge at the bottom of the loupe
                 // If loupe is near the bottom edge of monitor, flip badge to top
                 let badge_h = 24.0;
-                let badge_y = if my + radius + 35.0 > st.screenshot.height() as f64 {
+                let badge_y = if my + radius + 35.0 > screenshot.height() as f64 {
                     my - radius - badge_h - 10.0
                 } else {
                     my + radius + 10.0
@@ -164,10 +205,8 @@ impl MagnifierOverlay {
                     .map(|e| e.width())
                     .unwrap_or(80.0);
                 let badge_w = text_w + 32.0 + (padding * 2.0);
-                let badge_x = (mx - (badge_w / 2.0)).clamp(
-                    10.0,
-                    (st.screenshot.width() as f64 - badge_w - 10.0).max(10.0),
-                );
+                let badge_x = (mx - (badge_w / 2.0))
+                    .clamp(10.0, (screenshot.width() as f64 - badge_w - 10.0).max(10.0));
 
                 // Badge background
                 ctx.rectangle(badge_x, badge_y, badge_w, badge_h);
@@ -199,14 +238,19 @@ impl MagnifierOverlay {
 
         let motion = EventControllerMotion::new();
         {
-            let state = state.clone();
+            let position = mouse_pos.clone();
             let area = drawing_area.clone();
             let update_position = move |_: &EventControllerMotion, x, y| {
-                state.borrow_mut().mouse_pos = Some((x, y));
+                position.set(Some((x, y)));
                 area.queue_draw();
             };
             motion.connect_enter(update_position.clone());
             motion.connect_motion(update_position);
+            let area = drawing_area.clone();
+            motion.connect_leave(move |_| {
+                mouse_pos.set(None);
+                area.queue_draw();
+            });
         }
         window.add_controller(motion);
 
@@ -214,13 +258,13 @@ impl MagnifierOverlay {
             EventControllerScrollFlags::VERTICAL | EventControllerScrollFlags::DISCRETE,
         );
         {
-            let state = state.clone();
             let area = drawing_area.clone();
             scroll.connect_scroll(move |_, _, dy| {
-                let mut state = state.borrow_mut();
                 if dy != 0.0 {
-                    state.zoom_level = (state.zoom_level - dy.signum() as i32)
-                        .clamp(*zoom_range.start(), *zoom_range.end());
+                    zoom.set(
+                        (zoom.get() - dy.signum() as i32)
+                            .clamp(*zoom_range.start(), *zoom_range.end()),
+                    );
                     area.queue_draw();
                 }
                 glib::Propagation::Stop
@@ -228,14 +272,11 @@ impl MagnifierOverlay {
         }
         window.add_controller(scroll);
 
-        let finished = Rc::new(Cell::new(false));
         window.connect_close_request({
-            let finished = finished.clone();
+            let finish = finish.clone();
             move |_| {
-                if !finished.replace(true) {
-                    on_cancel();
-                }
-                glib::Propagation::Proceed
+                finish(None);
+                glib::Propagation::Stop
             }
         });
 
@@ -254,39 +295,29 @@ impl MagnifierOverlay {
 
         let click = GestureClick::new();
         click.set_button(0);
-        let weak_window = window.downgrade();
-        click.connect_pressed(move |gesture, count, x, y| {
-            let Some(window) = weak_window.upgrade() else {
-                return;
-            };
-            match gesture.current_button() {
-                1 if count == 1 && !finished.replace(true) => {
-                    let state = state.borrow();
-                    let screenshot = &state.screenshot;
-                    let (x, y) = screenshot_position(screenshot, &drawing_area, x, y);
-                    let x = (x as i32).clamp(0, screenshot.width() - 1);
-                    let y = (y as i32).clamp(0, screenshot.height() - 1);
-                    let pixels = screenshot.read_pixel_bytes();
-                    let offset =
-                        (screenshot.rowstride() * y + screenshot.n_channels() * x) as usize;
-                    let [r, g, b] = [pixels[offset], pixels[offset + 1], pixels[offset + 2]];
-                    let width = 60.min(screenshot.width());
-                    let height = 60.min(screenshot.height());
-                    let crop = screenshot.new_subpixbuf(
-                        (x - width / 2).clamp(0, screenshot.width() - width),
-                        (y - height / 2).clamp(0, screenshot.height() - height),
-                        width,
-                        height,
-                    );
-                    window.close();
-                    on_pick(r, g, b, crop);
-                }
-                3 => window.close(),
-                _ => {}
+        click.connect_pressed(move |gesture, count, x, y| match gesture.current_button() {
+            1 if count == 1 => {
+                let (x, y) = screenshot_position(&screenshot, &drawing_area, x, y);
+                let x = (x as i32).clamp(0, screenshot.width() - 1);
+                let y = (y as i32).clamp(0, screenshot.height() - 1);
+                let pixels = screenshot.read_pixel_bytes();
+                let offset = (screenshot.rowstride() * y + screenshot.n_channels() * x) as usize;
+                let [r, g, b] = [pixels[offset], pixels[offset + 1], pixels[offset + 2]];
+                let width = 60.min(screenshot.width());
+                let height = 60.min(screenshot.height());
+                let crop = screenshot.new_subpixbuf(
+                    (x - width / 2).clamp(0, screenshot.width() - width),
+                    (y - height / 2).clamp(0, screenshot.height() - height),
+                    width,
+                    height,
+                );
+                finish(Some((r, g, b, crop)));
             }
+            3 => finish(None),
+            _ => {}
         });
         window.add_controller(click);
-        window.present();
+        window
     }
 }
 

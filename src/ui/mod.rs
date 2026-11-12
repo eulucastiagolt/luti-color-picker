@@ -131,7 +131,6 @@ impl MainWindow {
 
         let palette_editor = studio::add_pages(&tabs, &window, &inner);
         inner.borrow_mut().palette_editor = Rc::downgrade(&palette_editor);
-
         // Set active formatter from state
         {
             let inner_borrow = inner.borrow();
@@ -199,21 +198,23 @@ impl MainWindow {
                 }
 
                 let mut dialogs = Vec::new();
-                let monitor = win_weak.upgrade().and_then(|window| {
-                    let monitor = capture_monitor(&window);
+                let screens = win_weak.upgrade().and_then(|window| {
+                    let display = gtk::prelude::WidgetExt::display(&window);
+                    let preferred = capture_monitor(&window);
+                    let mut monitors: Vec<_> = monitors(&display).collect();
+                    monitors.sort_by_key(|monitor| Some(monitor) == preferred.as_ref());
                     dialogs = visible_transient_windows(window.upcast_ref());
                     for dialog in dialogs.iter().rev() {
                         dialog.hide();
                     }
                     window.hide();
-                    gtk::prelude::WidgetExt::display(&window).sync();
-                    monitor
-                });
-
-                let screenshot = monitor.and_then(|monitor| {
+                    display.sync();
+                    let bounds = display_bounds(&display)?;
                     let screenshot = capture::capture_fullscreen()?;
-                    let screenshot = crop_monitor(&screenshot, &monitor)?;
-                    Some((screenshot, monitor))
+                    monitors
+                        .into_iter()
+                        .map(|monitor| Some((crop_monitor(&screenshot, &monitor, bounds)?, monitor)))
+                        .collect::<Option<Vec<_>>>()
                 });
 
                 let is_picking_end = is_picking_clone.clone();
@@ -232,7 +233,7 @@ impl MainWindow {
                     }
                 };
 
-                if let Some((monitor_screenshot, monitor)) = screenshot {
+                if let Some(screens) = screens {
                     let inner_c = inner_clone.clone();
                     let (fmt, zoom_range) = {
                         let inner = inner_clone.borrow();
@@ -246,8 +247,7 @@ impl MainWindow {
                     let reset_picker_2 = reset_picker;
 
                     MagnifierOverlay::start(
-                        monitor_screenshot,
-                        &monitor,
+                        screens,
                         fmt,
                         zoom_range,
                         snark_mode,
@@ -448,6 +448,7 @@ impl MainWindow {
         let col_name = inner.color_db.closest_name(r, g, b);
         let formatted = format_color(&inner.state.formatter, r, g, b, col_name);
         let palette_editor = inner.palette_editor.clone();
+        let shade_editor = palette_editor.clone();
         let swatch = crate::color::studio::Swatch {
             name: col_name.to_owned(),
             rgb: [r, g, b],
@@ -462,6 +463,11 @@ impl MainWindow {
             &inner.highlight_hex,
             &inner.lowlight_hex,
             inner.sound.clone(),
+            move |rgb| {
+                if let Some(editor) = shade_editor.upgrade() {
+                    editor.add_shade(rgb);
+                }
+            },
             move || {
                 if let Some(editor) = palette_editor.upgrade() {
                     editor.add_history_color(swatch.clone());
@@ -595,15 +601,18 @@ fn capture_monitor(window: &ApplicationWindow) -> Option<gdk::Monitor> {
         .or_else(|| monitors(&display).next())
 }
 
-fn crop_monitor(screenshot: &Pixbuf, monitor: &gdk::Monitor) -> Option<Pixbuf> {
-    let (left, top, width, height) = display_bounds(&monitor.display())?;
+fn crop_monitor(
+    screenshot: &Pixbuf,
+    monitor: &gdk::Monitor,
+    (left, top, width, height): (i32, i32, i32, i32),
+) -> Option<Pixbuf> {
     let geometry = monitor.geometry();
     let scale_x = f64::from(screenshot.width()) / f64::from(width);
     let scale_y = f64::from(screenshot.height()) / f64::from(height);
     let x = (f64::from(geometry.x() - left) * scale_x).round() as i32;
     let y = (f64::from(geometry.y() - top) * scale_y).round() as i32;
-    let right = x + (f64::from(geometry.width()) * scale_x).round() as i32;
-    let bottom = y + (f64::from(geometry.height()) * scale_y).round() as i32;
+    let right = (f64::from(geometry.x() + geometry.width() - left) * scale_x).round() as i32;
+    let bottom = (f64::from(geometry.y() + geometry.height() - top) * scale_y).round() as i32;
     let width = right.min(screenshot.width()) - x;
     let height = bottom.min(screenshot.height()) - y;
     (width > 0 && height > 0).then(|| screenshot.new_subpixbuf(x, y, width, height))

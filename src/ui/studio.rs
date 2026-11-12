@@ -1,4 +1,4 @@
-use super::{clipboard, persist, AppInner};
+use super::{clipboard, color_card::shades_button, persist, window_header, AppInner};
 use crate::color::studio::{
     export_palette, extract_colors, fractions, hex, render_png, GradientStop, Palette,
     PaletteFormat, Rgb, Swatch,
@@ -107,6 +107,7 @@ fn dialog(parent: &ApplicationWindow, title: &str, accept: &str) -> Dialog {
         ],
     );
     dialog.add_css_class("luti");
+    dialog.set_titlebar(Some(&window_header(title)));
     dialog.set_default_response(ResponseType::Accept);
     dialog.set_default_size(320, -1);
     dialog
@@ -136,14 +137,44 @@ fn edit_swatch(window: &ApplicationWindow, mut color: Swatch) -> Option<Swatch> 
     name.set_activates_default(true);
     let picker = color_button(color.rgb);
     picker.set_halign(Align::Start);
+    let code = Entry::new();
+    code.set_text(&hex(color.rgb));
+    code.set_placeholder_text(Some("HEX color"));
+    code.set_activates_default(true);
+    code.set_tooltip_text(Some("Enter a six-digit HEX color, such as #23C7B2"));
+    let preview = picker.downgrade();
+    let editor_dialog = dialog.downgrade();
+    code.connect_changed(move |entry| {
+        let rgb = parse_hex_color(&entry.text());
+        if let (Some(picker), Some(rgb)) = (preview.upgrade(), rgb) {
+            picker.set_rgba(&rgba(rgb));
+            entry.remove_css_class("error");
+        } else {
+            entry.add_css_class("error");
+        }
+        if let Some(dialog) = editor_dialog.upgrade() {
+            dialog.set_response_sensitive(ResponseType::Accept, rgb.is_some());
+        }
+    });
+    let code_entry = code.downgrade();
+    picker.connect_color_set(move |picker| {
+        if let Some(code) = code_entry.upgrade() {
+            code.set_text(&hex(selected_rgb(picker)));
+        }
+    });
     content.append(&name);
+    content.append(&code);
     content.append(&picker);
     dialog.content_area().append(&content);
     let response = glib::MainContext::default().block_on(dialog.run_future());
     color.name = name.text().trim().to_owned();
-    color.rgb = selected_rgb(&picker);
+    let rgb = parse_hex_color(&code.text());
     dialog.close();
-    (response == ResponseType::Accept).then_some(color)
+    if response != ResponseType::Accept {
+        return None;
+    }
+    color.rgb = rgb?;
+    Some(color)
 }
 
 fn save_file(
@@ -189,6 +220,12 @@ pub(super) struct PaletteEditor {
 }
 
 impl PaletteEditor {
+    pub(super) fn add_shade(self: &Rc<Self>, rgb: Rgb) {
+        let [r, g, b] = rgb;
+        let name = self.inner.borrow_mut().color_db.closest_name(r, g, b).to_owned();
+        self.add_history_color(Swatch { name, rgb });
+    }
+
     pub(super) fn add_history_color(self: &Rc<Self>, color: Swatch) {
         let choose_palette = self.inner.borrow().state.settings.choose_palette_for_history;
         if !choose_palette && self.selected().is_some() {
@@ -313,6 +350,23 @@ impl PaletteEditor {
             let description = label(&description);
             description.set_hexpand(true);
             row.append(&description);
+            let copy = Button::with_label("Copy");
+            let code = hex(color.rgb);
+            let sound = self.inner.borrow().sound.clone();
+            copy.connect_clicked(move |_| {
+                clipboard::copy_to_clipboard(&code);
+                if sound.get() {
+                    crate::audio::Feedback::Copy.play();
+                }
+            });
+            row.append(&copy);
+            let editor = Rc::downgrade(self);
+            let shades = shades_button(color.rgb, self.inner.borrow().sound.clone(), move |rgb| {
+                if let Some(editor) = editor.upgrade() {
+                    editor.add_shade(rgb);
+                }
+            });
+            row.append(&shades);
             let edit = Button::with_label("Edit");
             row.append(&edit);
             let remove = Button::with_label("Remove");
@@ -445,10 +499,9 @@ fn palette_page(window: &ApplicationWindow, inner: &State) -> (GtkBox, Rc<Palett
                 return;
             };
             let confirm = dialog(&window, "Delete palette", "Delete");
-            confirm
-                .content_area()
-                .append(&label("Delete this palette and all its colors?"));
-            confirm.add_css_class("luti");
+            let content = page();
+            content.append(&label("Delete this palette and all its colors?"));
+            confirm.content_area().append(&content);
             let response = glib::MainContext::default().block_on(confirm.run_future());
             confirm.close();
             if response != ResponseType::Accept {

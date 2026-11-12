@@ -14,6 +14,36 @@
   <launchable type="desktop-id">io.github.eulucastiagolt.LutiColorPicker.desktop</launchable>
   <url type="homepage">https://github.com/eulucastiagolt/luti-color-picker</url>
   <releases>
+    <release version="1.6.2" date="2026-11-12">
+      <description>
+        <p>Match palette dialogs to the application theme.</p>
+      </description>
+    </release>
+    <release version="1.6.1" date="2026-11-12">
+      <description>
+        <p>List shades with copy and palette actions on each row.</p>
+      </description>
+    </release>
+    <release version="1.6.0" date="2026-11-12">
+      <description>
+        <p>Show shades in a pop-up and let users copy, edit, and view shades of palette colors.</p>
+      </description>
+    </release>
+    <release version="1.5.0" date="2026-11-12">
+      <description>
+        <p>Select a shade from history and add it to a palette.</p>
+      </description>
+    </release>
+    <release version="1.4.0" date="2026-11-12">
+      <description>
+        <p>Show and copy lighter and darker shades of a selected history color.</p>
+      </description>
+    </release>
+    <release version="1.3.5" date="2026-11-12">
+      <description>
+        <p>Follow the pointer across multiple monitors during color capture.</p>
+      </description>
+    </release>
     <release version="1.3.4" date="2026-11-12">
       <description>
         <p>Keep color capture responsive when an application dialog is open.</p>
