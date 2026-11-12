@@ -1,3 +1,4 @@
+use crate::color::studio::{Gradient, Palette};
 use serde::{Deserialize, Serialize};
 use std::fs;
 use std::path::PathBuf;
@@ -48,6 +49,10 @@ pub struct AppState {
     pub metrics: Option<WindowMetrics>,
     #[serde(default)]
     pub settings: Settings,
+    #[serde(default)]
+    pub palettes: Vec<Palette>,
+    #[serde(default)]
+    pub gradient: Gradient,
 }
 
 fn default_formatter() -> String {
@@ -61,6 +66,8 @@ impl Default for AppState {
             formatter: default_formatter(),
             metrics: None,
             settings: Settings::default(),
+            palettes: Vec::new(),
+            gradient: Gradient::default(),
         }
     }
 }
@@ -128,6 +135,8 @@ mod tests {
         let state: AppState = serde_json::from_str(json_sample).unwrap();
         assert_eq!(state.colours.len(), 1);
         assert_eq!(state.colours[0].colour, [255, 128, 0]);
+        assert!(state.palettes.is_empty());
+        assert_eq!(state.gradient, Gradient::default());
         assert_eq!(state.formatter, "CSS hex");
         assert!(state.metrics.is_some());
         let metrics = state.metrics.unwrap();

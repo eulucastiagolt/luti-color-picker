@@ -39,6 +39,7 @@ impl ColorCard {
         highlight_hex: &str,
         lowlight_hex: &str,
         sound: Rc<Cell<bool>>,
+        add_to_palette: impl Fn() + 'static,
     ) -> Self {
         let eb = EventBox::new();
         let frame = Frame::new(None);
@@ -88,35 +89,18 @@ impl ColorCard {
         Self::update_label_markup(&label, name, formatted_val, highlight_hex, lowlight_hex);
         hb.pack_start(&label, true, true, 6);
 
-        // 4. Copy button
-        let copy_btn = Button::from_icon_name(Some("edit-copy-symbolic"), gtk::IconSize::Button);
-        copy_btn.set_label("Copy");
-        copy_btn.set_opacity(0.0);
+        let copy_btn = Button::with_label("Copy");
+        copy_btn.set_valign(Align::Center);
+        copy_btn.set_relief(gtk::ReliefStyle::None);
+        copy_btn.set_tooltip_text(Some("Copy to clipboard"));
         hb.pack_start(&copy_btn, false, false, 6);
 
-        // Hover / Focus effects
-        let copy_btn_clone1 = copy_btn.clone();
-        let copy_btn_clone2 = copy_btn.clone();
-        eb.connect_enter_notify_event(move |_, _| {
-            copy_btn_clone1.set_opacity(1.0);
-            glib::Propagation::Proceed
-        });
-        eb.connect_leave_notify_event(move |_, _| {
-            copy_btn_clone2.set_opacity(0.0);
-            glib::Propagation::Proceed
-        });
-
-        eb.set_can_focus(true);
-        let copy_btn_clone3 = copy_btn.clone();
-        let copy_btn_clone4 = copy_btn.clone();
-        eb.connect_focus_in_event(move |_, _| {
-            copy_btn_clone3.set_opacity(1.0);
-            glib::Propagation::Proceed
-        });
-        eb.connect_focus_out_event(move |_, _| {
-            copy_btn_clone4.set_opacity(0.0);
-            glib::Propagation::Proceed
-        });
+        let palette_btn = Button::with_label("Palette");
+        palette_btn.set_valign(Align::Center);
+        palette_btn.set_relief(gtk::ReliefStyle::None);
+        palette_btn.set_tooltip_text(Some("Add to palette"));
+        palette_btn.connect_clicked(move |_| add_to_palette());
+        hb.pack_start(&palette_btn, false, false, 6);
 
         // Click to copy action
         let copy_action = {

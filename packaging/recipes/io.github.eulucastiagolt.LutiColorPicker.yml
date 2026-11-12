@@ -1,0 +1,24 @@
+id: io.github.eulucastiagolt.LutiColorPicker
+runtime: org.gnome.Platform
+runtime-version: '49'
+sdk: org.gnome.Sdk
+sdk-extensions:
+  - org.freedesktop.Sdk.Extension.rust-stable
+command: luti-color-picker
+finish-args:
+  - --socket=wayland
+  - --socket=fallback-x11
+  - --share=ipc
+  - --talk-name=org.kde.StatusNotifierWatcher
+build-options:
+  append-path: /usr/lib/sdk/rust-stable/bin
+modules:
+  - name: luti-color-picker
+    buildsystem: simple
+    build-commands:
+      - cargo build --release --locked --offline
+      - install -Dm755 target/release/luti-color-picker packaging/luti-color-picker
+      - PREFIX=/app sh packaging/install.sh
+    sources:
+      - type: dir
+        path: source

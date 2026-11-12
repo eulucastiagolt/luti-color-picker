@@ -3,6 +3,7 @@ pub mod delta_e;
 pub mod formatters;
 pub mod names;
 pub mod snark;
+pub mod studio;
 
 use std::collections::HashMap;
 

@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<component type="desktop-application">
+  <id>io.github.eulucastiagolt.LutiColorPicker</id>
+  <name>Luti Color Picker</name>
+  <summary>Capture screen colors and keep a visual history</summary>
+  <metadata_license>CC0-1.0</metadata_license>
+  <project_license>MIT</project_license>
+  <developer id="io.github.eulucastiagolt">
+    <name>Lucas Tiago</name>
+  </developer>
+  <description>
+    <p>Capture colors with a magnifier, browse your visual history, create palettes and gradients, and extract dominant colors from images.</p>
+  </description>
+  <launchable type="desktop-id">io.github.eulucastiagolt.LutiColorPicker.desktop</launchable>
+  <url type="homepage">https://github.com/eulucastiagolt/luti-color-picker</url>
+  <content_rating type="oars-1.1"/>
+</component>

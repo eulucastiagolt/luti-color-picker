@@ -2,7 +2,7 @@
 set -eu
 
 root=$(CDPATH='' cd -- "$(dirname -- "$0")/.." && pwd)
-output=${1:-"$root/target/dist"}
+output=${1:-"$root/dist"}
 target_dir=${CARGO_TARGET_DIR:-"$root/target"}
 mkdir -p "$output"
 output=$(CDPATH='' cd -- "$output" && pwd)
@@ -18,6 +18,7 @@ trap 'rm -rf -- "$stage"' EXIT
 mkdir "$stage/$name"
 install -m755 "$binary" "$stage/$name/luti-color-picker"
 strip --strip-unneeded "$stage/$name/luti-color-picker"
-cp "$root"/packaging/* "$root/LICENSE" "$root/README.md" "$stage/$name/"
+cp "$root"/packaging/install.sh "$root"/packaging/*.desktop "$root"/packaging/*.png \
+    "$root"/packaging/*.metainfo.xml "$root/LICENSE" "$root/README.md" "$stage/$name/"
 tar -C "$stage" -czf "$output/$name.tar.gz" "$name"
 printf '%s\n' "$output/$name.tar.gz"

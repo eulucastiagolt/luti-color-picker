@@ -1,0 +1,18 @@
+pkgname=luti-color-picker
+pkgver=@VERSION@
+pkgrel=1
+pkgdesc='Screen color picker with a magnifier and visual history'
+arch=('@ARCH@')
+url='https://github.com/eulucastiagolt/luti-color-picker'
+license=('MIT')
+depends=('gtk3' 'glibc>=@GLIBC@')
+optdepends=('spectacle: magnifier on KDE Wayland'
+            'grim: magnifier on compatible Wayland compositors'
+            'xdg-desktop-portal: portal color picker'
+            'libcanberra: capture and copy sounds')
+source=('payload.tar.gz')
+sha256sums=('@SHA256@')
+
+package() {
+    cp -a --no-preserve=ownership "$srcdir/usr" "$pkgdir/"
+}

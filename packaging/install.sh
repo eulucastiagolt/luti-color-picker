@@ -7,6 +7,7 @@ app_id=io.github.eulucastiagolt.LutiColorPicker
 
 install -Dm755 "$package_dir/luti-color-picker" "$prefix/bin/luti-color-picker"
 install -Dm644 "$package_dir/$app_id.desktop" "$prefix/share/applications/$app_id.desktop"
+install -Dm644 "$package_dir/$app_id.metainfo.xml" "$prefix/share/metainfo/$app_id.metainfo.xml"
 install -Dm644 "$package_dir/$app_id.png" "$prefix/share/icons/hicolor/256x256/apps/$app_id.png"
 install -Dm644 "$package_dir/LICENSE" "$prefix/share/licenses/luti-color-picker/LICENSE"
 

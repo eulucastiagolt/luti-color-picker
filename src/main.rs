@@ -50,15 +50,24 @@ fn main() {
                 return 2;
             };
 
-            let mut current = current_window.borrow_mut();
-            let main_window = current.get_or_insert_with(|| MainWindow::new(app, args.snark, args.background));
-            main_window.window.show_all();
-            main_window.window.present();
+            let window = {
+                let mut current = current_window.borrow_mut();
+                let main_window = current
+                    .get_or_insert_with(|| MainWindow::new(app, args.snark, args.background));
+                main_window.window.show_all();
+                main_window.window.present();
+                if args.pick {
+                    main_window.capture();
+                }
+                main_window.window.clone()
+            };
             if args.about {
-                ui::about::show_about_dialog(Some(main_window.window.upcast_ref()));
-            }
-            if args.pick {
-                main_window.capture();
+                let window = window.downgrade();
+                glib::idle_add_local_once(move || {
+                    if let Some(window) = window.upgrade() {
+                        ui::about::show_about_dialog(Some(window.upcast_ref()));
+                    }
+                });
             }
             0
         }

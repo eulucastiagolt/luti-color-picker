@@ -1,0 +1,32 @@
+name: luti-color-picker
+base: core24
+adopt-info: luti
+title: Luti Color Picker
+summary: Capture screen colors and keep a visual history
+description: |
+  Capture colors with a magnifier, browse your visual history, create palettes
+  and gradients, and extract dominant colors from images.
+grade: stable
+confinement: strict
+license: MIT
+website: https://github.com/eulucastiagolt/luti-color-picker
+
+apps:
+  luti-color-picker:
+    command: usr/bin/luti-color-picker
+    extensions: [gnome]
+    plugs: [wayland, x11, desktop, desktop-legacy]
+
+parts:
+  luti:
+    plugin: rust
+    source: .
+    rust-channel: stable
+    build-packages: [pkg-config, libgtk-3-dev]
+    override-pull: |
+      craftctl default
+      craftctl set version="$(sed -n 's/^version = "\([^"]*\)"$/\1/p' Cargo.toml | head -n 1)"
+    override-build: |
+      cargo build --release --locked
+      install -Dm755 target/release/luti-color-picker packaging/luti-color-picker
+      PREFIX="$CRAFT_PART_INSTALL/usr" sh packaging/install.sh

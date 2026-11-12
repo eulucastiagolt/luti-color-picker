@@ -4,6 +4,7 @@ pub mod color_card;
 pub mod empty_state;
 pub mod magnifier_overlay;
 mod settings;
+mod studio;
 pub mod tray;
 
 use crate::capture;
@@ -35,9 +36,9 @@ struct AppInner {
     color_db: ColorDatabase,
     sound: Rc<Cell<bool>>,
     cards: Vec<ColorCard>,
+    palette_editor: std::rc::Weak<studio::PaletteEditor>,
     container_vb: gtk::Box,
-    main_vb: gtk::Box,
-    empty_box: gtk::Box,
+    history_stack: gtk::Stack,
     btn_clear: Button,
     highlight_hex: String,
     lowlight_hex: String,
@@ -54,7 +55,8 @@ impl MainWindow {
     pub fn new(app: &Application, snark_mode: bool, force_background: bool) -> Self {
         let window = ApplicationWindow::new(app);
         window.set_title(crate::APP_NAME);
-        window.set_size_request(320, 500);
+        window.set_size_request(400, 440);
+        window.set_default_size(480, 570);
 
         // HeaderBar
         let header = HeaderBar::new();
@@ -102,11 +104,6 @@ impl MainWindow {
                 border-width: 0 0 1px 0;
                 padding: 6px 0;
             }}
-            eventbox:focus {{
-                outline-color: rgba(0, 0, 0, 0.3);
-                outline-style: solid;
-                outline-width: 1px;
-            }}
             "#
         );
         let css_provider = CssProvider::new();
@@ -140,7 +137,11 @@ impl MainWindow {
         let hb_history = gtk::Box::new(Orientation::Horizontal, 0);
         let history_frame = Frame::new(None);
         let container_vb = gtk::Box::new(Orientation::Vertical, 0);
-        history_frame.add(&container_vb);
+        let history_scroll = gtk::ScrolledWindow::new(None::<&gtk::Adjustment>, None::<&gtk::Adjustment>);
+        history_scroll.set_policy(gtk::PolicyType::Never, gtk::PolicyType::Automatic);
+        history_scroll.set_min_content_height(130);
+        history_scroll.add(&container_vb);
+        history_frame.add(&history_scroll);
         hb_history.pack_start(&history_frame, true, true, 12);
         main_vb.pack_start(&hb_history, true, true, 0);
 
@@ -153,6 +154,13 @@ impl MainWindow {
 
         // Empty state
         let empty_box = empty_state::build_empty_state();
+        let history_stack = gtk::Stack::new();
+        history_stack.add_named(&empty_box, "empty");
+        history_stack.add_named(&main_vb, "history");
+        let tabs = gtk::Notebook::new();
+        tabs.set_scrollable(true);
+        tabs.append_page(&history_stack, Some(&Label::new(Some("History"))));
+        window.add(&tabs);
 
         let initial_state = load_state();
 
@@ -161,9 +169,9 @@ impl MainWindow {
             state: initial_state,
             color_db: ColorDatabase::new(snark_mode),
             cards: Vec::new(),
+            palette_editor: std::rc::Weak::new(),
             container_vb: container_vb.clone(),
-            main_vb: main_vb.clone(),
-            empty_box: empty_box.clone(),
+            history_stack,
             btn_clear: btn_clear.clone(),
             highlight_hex,
             lowlight_hex,
@@ -180,6 +188,9 @@ impl MainWindow {
                 }
             });
         }
+
+        let palette_editor = studio::add_pages(&tabs, &window, &inner);
+        inner.borrow_mut().palette_editor = Rc::downgrade(&palette_editor);
 
         // Set active formatter from state
         {
@@ -219,7 +230,6 @@ impl MainWindow {
         // Clear history button clicked
         {
             let inner_clone = inner.clone();
-            let win_weak = window.downgrade();
             btn_clear.connect_clicked(move |_| {
                 let mut inner_borrow = inner_clone.borrow_mut();
                 inner_borrow.state.colours.clear();
@@ -229,11 +239,7 @@ impl MainWindow {
                     inner_borrow.container_vb.remove(&child);
                 }
 
-                if let Some(win) = win_weak.upgrade() {
-                    win.remove(&inner_borrow.main_vb);
-                    win.add(&inner_borrow.empty_box);
-                    win.show_all();
-                }
+                inner_borrow.history_stack.set_visible_child_name("empty");
                 inner_borrow.btn_clear.set_sensitive(false);
                 persist(&inner_borrow.state);
             });
@@ -333,7 +339,6 @@ impl MainWindow {
 
                 if let Some(full_screenshot) = screenshot_opt {
                     let inner_c = inner_clone.clone();
-                    let win_w = win_weak.clone();
                     let fmt = inner_clone.borrow().state.formatter.clone();
 
                     // Crop to the active monitor geometry (resolves multi-monitor offset and "below the screen" issues)
@@ -356,7 +361,7 @@ impl MainWindow {
                         token,
                         move |r, g, b, crop| {
                             reset_picker_1();
-                            Self::finish_capture(&inner_c, (r, g, b), Some(crop), &win_w.upgrade());
+                            Self::finish_capture(&inner_c, (r, g, b), Some(crop));
                         },
                         move || {
                             reset_picker_2();
@@ -365,13 +370,12 @@ impl MainWindow {
                 } else {
                     // Fallback to portal if screenshot tool is missing
                     let inner_c = inner_clone.clone();
-                    let win_w = win_weak.clone();
                     glib::MainContext::default().spawn_local(async move {
                         let color = capture::pick_color_portal().await;
                         reset_picker();
                         if let Some((r, g, b)) = color {
                             let swatch = capture::create_color_swatch_pixbuf(r, g, b, 60, 60);
-                            Self::finish_capture(&inner_c, (r, g, b), swatch, &win_w.upgrade());
+                            Self::finish_capture(&inner_c, (r, g, b), swatch);
                         }
                     });
                 }
@@ -435,10 +439,11 @@ impl MainWindow {
             let mut inner_borrow = inner.borrow_mut();
             let history_items = inner_borrow.state.colours.clone();
 
+            inner_borrow.history_stack.show_all();
             if history_items.is_empty() {
-                window.add(&inner_borrow.empty_box);
+                inner_borrow.history_stack.set_visible_child_name("empty");
             } else {
-                window.add(&inner_borrow.main_vb);
+                inner_borrow.history_stack.set_visible_child_name("history");
                 for item in history_items {
                     let pb = capture::base64_png_to_pixbuf(&item.imgdata);
                     Self::add_color_item_view(
@@ -550,18 +555,17 @@ impl MainWindow {
         inner: &RefCell<AppInner>,
         (r, g, b): (u8, u8, u8),
         thumbnail: Option<Pixbuf>,
-        window: &Option<ApplicationWindow>,
     ) {
         let mut inner = inner.borrow_mut();
         let image = thumbnail.as_ref().and_then(capture::pixbuf_to_base64_png).unwrap_or_default();
-        Self::add_color_item(&mut inner, r, g, b, &image, thumbnail, window);
+        Self::add_color_item(&mut inner, r, g, b, &image, thumbnail);
         persist(&inner.state);
 
         if inner.state.settings.auto_copy {
             let name = inner.color_db.closest_name(r, g, b);
             let formatted = format_color(&inner.state.formatter, r, g, b, name);
             clipboard::copy_to_clipboard(&formatted);
-            if let Some(card) = inner.cards.first() {
+            if let Some(card) = inner.cards.last() {
                 card.label.style_context().add_class("highlighted");
                 let label = card.label.downgrade();
                 glib::timeout_add_local_once(std::time::Duration::from_millis(300), move || {
@@ -585,6 +589,8 @@ impl MainWindow {
     ) {
         let col_name = inner.color_db.closest_name(r, g, b);
         let formatted = format_color(&inner.state.formatter, r, g, b, col_name);
+        let palette_editor = inner.palette_editor.clone();
+        let swatch = crate::color::studio::Swatch { name: col_name.to_owned(), rgb: [r, g, b] };
         let card = ColorCard::new(
             r,
             g,
@@ -595,6 +601,11 @@ impl MainWindow {
             &inner.highlight_hex,
             &inner.lowlight_hex,
             inner.sound.clone(),
+            move || {
+                if let Some(editor) = palette_editor.upgrade() {
+                    editor.add_history_color(swatch.clone());
+                }
+            },
         );
 
         let revealer = Revealer::new();
@@ -606,15 +617,7 @@ impl MainWindow {
         revealer.show_all();
         revealer.set_reveal_child(true);
 
-        inner.cards.insert(0, card);
-
-        while inner.cards.len() > 5 {
-            inner.cards.pop();
-            let children = inner.container_vb.children();
-            if let Some(last_child) = children.last() {
-                inner.container_vb.remove(last_child);
-            }
-        }
+        inner.cards.push(card);
     }
 
     fn add_color_item(
@@ -624,7 +627,6 @@ impl MainWindow {
         b: u8,
         imgdata: &str,
         pixbuf: Option<Pixbuf>,
-        win_opt: &Option<ApplicationWindow>,
     ) {
         // Defensive check: prevent consecutive duplicate additions
         if let Some(last) = inner.state.colours.last() {
@@ -638,21 +640,8 @@ impl MainWindow {
             colour: [r, g, b],
         });
 
-        while inner.state.colours.len() > 5 {
-            inner.state.colours.remove(0);
-        }
-
         Self::add_color_item_view(inner, r, g, b, pixbuf);
-
-        if let Some(win) = win_opt {
-            if inner.empty_box.parent().is_some() {
-                win.remove(&inner.empty_box);
-            }
-            if inner.main_vb.parent().is_none() {
-                win.add(&inner.main_vb);
-                inner.main_vb.show_all();
-            }
-        }
+        inner.history_stack.set_visible_child_name("history");
         inner.btn_clear.set_sensitive(true);
     }
 }
