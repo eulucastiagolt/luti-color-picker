@@ -67,7 +67,7 @@ impl ksni::Tray for PickTray {
 
         vec![
             StandardItem {
-                label: "Capturar cor".into(),
+                label: "Capture color".into(),
                 icon_name: "color-picker".into(),
                 activate: Box::new(move |_| {
                     let token = get_activation_token();
@@ -77,7 +77,7 @@ impl ksni::Tray for PickTray {
             }
             .into(),
             StandardItem {
-                label: "Mostrar janela".into(),
+                label: "Show window".into(),
                 icon_name: "window-new".into(),
                 activate: Box::new(move |_| {
                     let token = get_activation_token();
@@ -88,7 +88,7 @@ impl ksni::Tray for PickTray {
             .into(),
             MenuItem::Separator,
             StandardItem {
-                label: "Sobre".into(),
+                label: "About".into(),
                 icon_name: "help-about".into(),
                 activate: Box::new(move |_| {
                     let _ = tx_about.try_send(TrayCommand::ShowAbout);
@@ -97,7 +97,7 @@ impl ksni::Tray for PickTray {
             }
             .into(),
             StandardItem {
-                label: "Sair".into(),
+                label: "Quit".into(),
                 icon_name: "application-exit".into(),
                 activate: Box::new(move |_| {
                     let _ = tx_quit.try_send(TrayCommand::Quit);
@@ -114,7 +114,7 @@ pub fn spawn_tray(tx: Sender<TrayCommand>) -> Option<ksni::blocking::Handle<Pick
     match tray.spawn() {
         Ok(handle) => Some(handle),
         Err(e) => {
-            eprintln!("Aviso: Não foi possível registrar o ícone na bandeja do sistema: {e}");
+            eprintln!("Warning: Could not register the system tray icon: {e}");
             None
         }
     }

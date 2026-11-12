@@ -49,6 +49,6 @@ cargo run --locked
 
 Build on a distribution compatible with your intended users. The package is written to `dist/`.
 
-Run `make build` or `make dist` to build all available formats. The packaging script reports missing tools and build failures separately. Run `./scripts/build-package.sh FORMAT` to build a single format. See the [release guide](docs/GUIA-RELEASE.md) for tooling and installation instructions.
+Run `make build` or `make dist` to build all available formats. The packaging script reports missing tools and build failures separately. Run `./scripts/build-package.sh FORMAT` to build a single format. See the [release guide](docs/RELEASE-GUIDE.md) for tooling and installation instructions.
 
 Rust version author **Lucas Tiago**. See [LICENSE](LICENSE) for the MIT terms and copyright notices.

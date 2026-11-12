@@ -1,6 +1,6 @@
-# Validação para distribuição
+# Distribution validation
 
-- [ ] Conferir captura, zoom, cancelamento, cor copiada e miniatura em KDE Wayland e X11.
-- [ ] Conferir a cor selecionada em monitores com escalas diferentes e em suas bordas.
-- [ ] Validar abertura da bandeja, configurações e ações do menu em uma instalação limpa.
-- [ ] Testar o pacote nas distribuições Linux escolhidas para a distribuição.
+- [ ] Verify capture, zoom, cancellation, clipboard output, and thumbnails on KDE Wayland and X11.
+- [ ] Check color selection at the edges of monitors and across monitors with different display scales.
+- [ ] Verify the tray, settings, and menu actions on a clean installation.
+- [ ] Test each package on its target Linux distributions.

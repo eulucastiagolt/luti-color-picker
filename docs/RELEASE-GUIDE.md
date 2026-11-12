@@ -1,4 +1,4 @@
-# Luti Color Picker 1.1.0
+# Luti Color Picker 1.1.1
 
 ## Build release packages
 
@@ -43,35 +43,18 @@ Confirm the version under **About** or by running `luti-color-picker --version`.
 Review and commit the release changes. Create an annotated tag and push it together with the release commit.
 
 ```sh
-git tag -a v1.1.0 -m "Luti Color Picker 1.1.0"
-git push origin main v1.1.0
+git tag -a v1.1.1 -m "Luti Color Picker 1.1.1"
+git push origin main v1.1.1
 ```
 
 Use the notes below for the GitHub release and attach the packages built for the tag.
 
 ## GitHub release notes
 
-Luti Color Picker 1.1.0 brings global color capture, a configurable magnifier, and a faster way to add colors from your history to a palette.
-
-### Capture from anywhere
-
-Enable **Register a global shortcut to capture a color** in **Settings**. The suggested combination is **Ctrl+Alt+P**. On GNOME, native installations can register a desktop shortcut that also launches capture when the app is closed. On KDE Plasma and other supported desktops, registration uses the XDG GlobalShortcuts portal and the app must be running. **Settings** also shows the command for desktops that use custom keyboard shortcuts.
-
-### Magnifier and palettes
-
-- The magnifier opens at the pointer even when the mouse is stationary. Set the minimum and maximum zoom in **Settings**. The default range is **2× to 7×**.
-- **Palette** on a history card now adds the color directly to the palette selected in **Palettes**. Enable **Ask which palette to add history colors to** to choose the destination for each color.
-- Numeric controls now have separate input and button outlines, with spacing between the field and the step buttons.
-
-### Desktop integration and interface
-
-- The app now uses GTK 4. The header has one app icon and simpler window controls.
-- **Settings** controls automatic copying, sound feedback, staying in the tray after closing the window, and startup at login on supported installations.
-- Capture and copy play distinct built-in sounds through the system's default audio output.
-- X11 screen capture uses the X11 connection directly. On Wayland, magnifier availability depends on Spectacle or grim, with a portal color picker available on supported desktops.
+Luti Color Picker 1.1.1 standardizes the remaining repository documentation, tray menu, diagnostic message, and desktop launcher labels in English. The features introduced in [v1.1.0](https://github.com/eulucastiagolt/luti-color-picker/releases/tag/v1.1.0) are included.
 
 ### Linux downloads
 
 The x86_64 downloads include AppImage, a portable `.run` launcher, Debian/Ubuntu (`.deb`), Fedora-compatible RPM (`.rpm`), and Arch Linux (`.pkg.tar.zst`). These builds require GTK 4 and glibc 2.39 or newer. The SHA-256 manifest covers all five packages. Flatpak and Snap build recipes are available in the source tree.
 
-Mark the AppImage or `.run` file executable before launching it. For distro packages, use your system package manager. See the [release guide](https://github.com/eulucastiagolt/luti-color-picker/blob/v1.1.0/docs/GUIA-RELEASE.md#test-the-packages) for installation commands.
+See the [release guide](https://github.com/eulucastiagolt/luti-color-picker/blob/v1.1.1/docs/RELEASE-GUIDE.md#test-the-packages) for installation commands.
