@@ -1,5 +1,6 @@
 pub mod audio;
 mod autostart;
+mod updates;
 pub mod capture;
 pub mod color;
 pub mod storage;
@@ -43,6 +44,7 @@ fn main() {
     gtk::Window::set_default_icon_name(APP_ID);
 
     let app = gtk::Application::new(Some(APP_ID), gio::ApplicationFlags::HANDLES_COMMAND_LINE);
+    app.connect_startup(updates::start);
     let current_window = Rc::new(RefCell::new(None::<MainWindow>));
     app.connect_command_line({
         let current_window = current_window.clone();

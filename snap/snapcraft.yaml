@@ -15,7 +15,7 @@ apps:
   luti-color-picker:
     command: usr/bin/luti-color-picker
     extensions: [gnome]
-    plugs: [wayland, x11, desktop, desktop-legacy, audio-playback]
+    plugs: [wayland, x11, desktop, desktop-legacy, audio-playback, network]
 
 parts:
   luti:

@@ -1,4 +1,4 @@
-# Luti Color Picker 1.1.1
+# Luti Color Picker 1.2.0
 
 ## Build release packages
 
@@ -6,7 +6,7 @@ Run `make build` or `make dist` from the repository root. The script attempts ea
 
 | Format | Command | Additional tools |
 | --- | --- | --- |
-| AppImage | `./scripts/build-package.sh appimage` | `appimagetool` |
+| AppImage | `./scripts/build-package.sh appimage` | `appimagetool` and `zsyncmake` |
 | Debian and Ubuntu | `./scripts/build-package.sh deb` | `dpkg-deb` |
 | Fedora and derivatives | `./scripts/build-package.sh rpm` | `rpmbuild` and the distribution's RPM tooling |
 | Arch and derivatives | `./scripts/build-package.sh arch` | `makepkg` and `base-devel`, as a regular user |
@@ -43,18 +43,23 @@ Confirm the version under **About** or by running `luti-color-picker --version`.
 Review and commit the release changes. Create an annotated tag and push it together with the release commit.
 
 ```sh
-git tag -a v1.1.1 -m "Luti Color Picker 1.1.1"
-git push origin main v1.1.1
+git tag -a v1.2.0 -m "Luti Color Picker 1.2.0"
+git push origin main v1.2.0
 ```
 
-Use the notes below for the GitHub release and attach the packages built for the tag.
+Use the notes below for the GitHub release and attach the packages built for the tag. Upload the AppImage and its matching `.AppImage.zsync` file to the same stable release. Keep their generated filenames so AppImage managers can find the right update for the installed architecture.
 
 ## GitHub release notes
 
-Luti Color Picker 1.1.1 standardizes the remaining repository documentation, tray menu, diagnostic message, and desktop launcher labels in English. The features introduced in [v1.1.0](https://github.com/eulucastiagolt/luti-color-picker/releases/tag/v1.1.0) are included.
+Luti Color Picker 1.2.0 adds update discovery for AppImage managers and desktop notifications for new stable releases.
+
+- The AppImage embeds the GitHub Releases update source. Compatible managers can discover a newer AppImage using the matching `.AppImage.zsync` asset.
+- The app checks GitHub at startup and every six hours while running. When it finds a newer stable version, the desktop notification opens that release on GitHub. Installation is handled by your AppImage manager or package manager.
+
+The existing capture, magnifier, palette, and gradient features are included.
 
 ### Linux downloads
 
-The x86_64 downloads include AppImage, a portable `.run` launcher, Debian/Ubuntu (`.deb`), Fedora-compatible RPM (`.rpm`), and Arch Linux (`.pkg.tar.zst`). These builds require GTK 4 and glibc 2.39 or newer. The SHA-256 manifest covers all five packages. Flatpak and Snap build recipes are available in the source tree.
+The x86_64 release includes AppImage, a portable `.run` launcher, Debian/Ubuntu, RPM, and Arch Linux packages. Flatpak and Snap build recipes are available in the source tree.
 
-See the [release guide](https://github.com/eulucastiagolt/luti-color-picker/blob/v1.1.1/docs/RELEASE-GUIDE.md#test-the-packages) for installation commands.
+If you currently use an AppImage from an earlier release, download the 1.2.0 AppImage once to switch to a build with embedded update information. The `.zsync` file is used by update tools. To launch the app, download the `.AppImage` file.

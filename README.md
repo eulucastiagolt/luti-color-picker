@@ -37,6 +37,10 @@ Enable **Register a global shortcut to capture a color** under **Settings**. The
 
 On a desktop without the portal, copy the command shown under **Settings** and register it as a custom keyboard shortcut. For a native installation on your `PATH`, use `luti-color-picker --pick`.
 
+## Updates
+
+The AppImage includes GitHub Releases metadata for compatible AppImage managers. Install the AppImage from version 1.2.0 or later to enable update discovery. While running, the app checks for newer stable versions at startup and every six hours. Select **View release** in the desktop notification to open the release page.
+
 ## Building and packaging
 
 Install Rust 1.92 or newer, Cargo, a native build toolchain, and the GTK 4 development files.

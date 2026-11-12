@@ -46,7 +46,7 @@ if [[ "$format" == all ]]; then
 fi
 
 case "$format" in
-    appimage) required=(appimagetool) ;;
+    appimage) required=(appimagetool zsyncmake) ;;
     run) required=(tar gzip) ;;
     deb) required=(dpkg-deb readelf) ;;
     rpm) required=(rpmbuild) ;;
@@ -125,7 +125,12 @@ case "$format" in
         cp "packaging/$app_id.desktop" "packaging/$app_id.png" "$appdir/"
         if [[ "$format" == appimage ]]; then
             mv "$appdir/usr/share/metainfo/$app_id.metainfo.xml" "$appdir/usr/share/metainfo/$app_id.appdata.xml"
-            ARCH="$arch" appimagetool "$appdir" "$output/$name.AppImage"
+            update_info="gh-releases-zsync|eulucastiagolt|luti-color-picker|latest|$app-*-linux-$arch.AppImage.zsync"
+            (
+                cd "$output"
+                ARCH="$arch" appimagetool --updateinformation "$update_info" "$appdir" "$name.AppImage"
+            )
+            test -s "$output/$name.AppImage.zsync"
         else
             tar -C "$appdir" -czf "$stage/appdir.tar.gz" .
             cat packaging/recipes/run-header.sh "$stage/appdir.tar.gz" > "$output/$name.run"

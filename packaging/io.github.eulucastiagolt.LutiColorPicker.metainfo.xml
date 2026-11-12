@@ -14,6 +14,11 @@
   <launchable type="desktop-id">io.github.eulucastiagolt.LutiColorPicker.desktop</launchable>
   <url type="homepage">https://github.com/eulucastiagolt/luti-color-picker</url>
   <releases>
+    <release version="1.2.0" date="2026-11-12">
+      <description>
+        <p>Add AppImage update metadata and desktop notifications for new stable releases.</p>
+      </description>
+    </release>
     <release version="1.1.1" date="2026-11-12">
       <description>
         <p>Standardize the tray menu and desktop launcher labels in English.</p>
