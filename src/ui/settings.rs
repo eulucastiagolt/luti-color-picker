@@ -35,7 +35,7 @@ pub(super) fn show(
     let choose_palette = CheckButton::with_label("Ask which palette to add history colors to");
     let background = CheckButton::with_label("Keep running in the tray when the window closes");
     let start_at_login = CheckButton::with_label("Start at login");
-    let start_minimized = CheckButton::with_label("Start minimized");
+    let start_minimized = CheckButton::with_label("Start in the system tray at login");
     let global_shortcut = CheckButton::with_label("Register a global shortcut to capture a color");
     global_shortcut.set_active(current.global_shortcut);
     let autostart_supported = autostart::supported();

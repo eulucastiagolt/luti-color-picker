@@ -30,6 +30,9 @@ struct Args {
 
     #[arg(long, alias = "tray", help = "Keep running in the system tray")]
     background: bool,
+
+    #[arg(long, help = "Launch from the desktop login startup entry")]
+    autostart: bool,
 }
 
 fn main() {
@@ -52,6 +55,10 @@ fn main() {
             let Ok(args) = Args::try_parse_from(command.arguments()) else {
                 return 2.into();
             };
+            let login_launch = args.autostart && !args.pick && !args.about;
+            if login_launch && command.is_remote() {
+                return glib::ExitCode::SUCCESS;
+            }
 
             let window = {
                 let mut current = current_window.borrow_mut();
@@ -66,10 +73,7 @@ fn main() {
                 });
                 if args.pick {
                     main_window.capture();
-                } else if start_minimized && !args.about {
-                    main_window.window.minimize();
-                    main_window.window.set_visible(true);
-                } else {
+                } else if !(login_launch && start_minimized && main_window.start_in_tray(app)) {
                     main_window.window.unminimize();
                     main_window.window.present();
                 }

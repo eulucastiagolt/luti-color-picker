@@ -14,6 +14,11 @@
   <launchable type="desktop-id">io.github.eulucastiagolt.LutiColorPicker.desktop</launchable>
   <url type="homepage">https://github.com/eulucastiagolt/luti-color-picker</url>
   <releases>
+    <release version="1.8.3" date="2026-11-13">
+      <description>
+        <p>Start in the system tray at login and open the main window when launched manually.</p>
+      </description>
+    </release>
     <release version="1.8.2" date="2026-11-13">
       <description>
         <p>Improve clipboard reliability when copying colors and gradients.</p>

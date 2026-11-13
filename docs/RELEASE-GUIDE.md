@@ -1,4 +1,4 @@
-# Luti Color Picker 1.8.2
+# Luti Color Picker 1.8.3
 
 ## Build release packages
 
@@ -35,38 +35,26 @@ Confirm the version under **About** or by running `luti-color-picker --version`.
 Review the changes since the previous public tag. Write the release commit in English, with `Release Luti Color Picker X.Y.Z` as its subject. In the body, summarize the user-facing features and fixes, list any changes to packaging or updates, and record the validation performed. Create an annotated tag and push it together with the release commit.
 
 ```sh
-git tag -a v1.8.2 -m "Luti Color Picker 1.8.2"
-git push origin main v1.8.2
+git tag -a v1.8.3 -m "Luti Color Picker 1.8.3"
+git push origin main v1.8.3
 ```
 
 Write the GitHub release notes in English. Use the notes below as a model. Group changes by feature and describe what users can do, where to find each feature, and what changed. Include fixes and verified behavior. Link to the README for installation commands. Attach the packages built for the tag. Upload the AppImage and its matching `.AppImage.zsync` file to the same stable release so AppImage managers can find the update for the installed architecture.
 
 ## GitHub release notes
 
-Luti Color Picker 1.8.2 adds a live text contrast checker, expands the Shades dialog to eleven tones, and improves clipboard reliability on Linux.
+Luti Color Picker 1.8.3 fixes how the app starts at login and how it opens from the application menu.
 
-### What's new in 1.8.2
+### Startup fixes
 
-#### Color Contrast Checker
+- **Start in the tray at login.** Enable **Start in the system tray at login** in Settings to keep the main window off the taskbar during automatic startup. If a compatible tray is unavailable, the app opens the main window.
+- **Open the window from the application menu.** Launching Luti Color Picker manually shows the main window, including when the app is already running in the tray.
+- **Preserve existing startup preferences.** On the first run after updating, the app migrates startup entries created by earlier versions and preserves whether startup at login is enabled.
 
-- **Live preview.** Open **Color Contrast Checker** and enter HEX codes or use the color selectors to set the text and background colors. Use **Swap** to reverse the pair.
-- **WCAG 2.2 results.** See the contrast ratio and separate results for normal and large text at levels AA and AAA. Green **Pass** and red **Fail** labels show which thresholds the pair meets.
+### Verification
 
-#### Shades
-
-- **Eleven tones.** Open **Shades** from **History** or **Palettes** to see an Oklab scale from 50 to 950. The source color is marked **Original**.
-- **Individual shade actions.** Each row shows its HEX code and has its own **Copy** and **Add to palette** buttons.
-
-### Clipboard fixes
-
-- **Copy colors and gradient CSS.** The app writes directly to the GTK system clipboard, avoiding the wait for a separate clipboard command.
-- **Automatic copy after capture.** The magnifier writes the sampled color while the capture window is still open.
-- **Verification.** Sequential History copies and gradient CSS were checked on X11. Automatic copy from the magnifier was checked on KDE Wayland. All 11 automated tests passed.
+An isolated desktop session verified tray startup, reopening from the application menu, startup with the tray option disabled, and fallback on a desktop without a tray. All 11 automated tests passed.
 
 ### Downloads
 
-Linux x86_64 packages and SHA-256 checksums are available in the assets below. See the [installation guide in the README](https://github.com/eulucastiagolt/luti-color-picker/blob/main/README.md#installation) for commands by format.
-
-### Feedback
-
-Report bugs or request improvements on [GitHub Issues](https://github.com/eulucastiagolt/luti-color-picker/issues).
+See the [README](https://github.com/eulucastiagolt/luti-color-picker/blob/main/README.md#installation) for installation instructions.

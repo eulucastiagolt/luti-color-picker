@@ -4,13 +4,13 @@ Linux color picker with a magnifier, scrollable visual history, and 11 copy form
 
 ## Installation
 
-Download the package for your distribution from [GitHub Releases](https://github.com/eulucastiagolt/luti-color-picker/releases/latest). The commands below use the Linux x86_64 files from version 1.8.2. Substitute the filename you downloaded.
+Download the package for your distribution from [GitHub Releases](https://github.com/eulucastiagolt/luti-color-picker/releases/latest). The commands below use the Linux x86_64 files from version 1.8.3. Substitute the filename you downloaded.
 
 ### AppImage
 
 ```sh
-chmod +x luti-color-picker-1.8.2-linux-x86_64.AppImage
-./luti-color-picker-1.8.2-linux-x86_64.AppImage
+chmod +x luti-color-picker-1.8.3-linux-x86_64.AppImage
+./luti-color-picker-1.8.3-linux-x86_64.AppImage
 ```
 
 The AppImage includes GitHub update information. Compatible update managers use the matching `.AppImage.zsync` file. If you have an AppImage older than 1.2.0, download the new AppImage once to switch to a build with embedded update information.
@@ -18,26 +18,26 @@ The AppImage includes GitHub update information. Compatible update managers use 
 ### Portable launcher
 
 ```sh
-chmod +x luti-color-picker-1.8.2-linux-x86_64.run
-./luti-color-picker-1.8.2-linux-x86_64.run
+chmod +x luti-color-picker-1.8.3-linux-x86_64.run
+./luti-color-picker-1.8.3-linux-x86_64.run
 ```
 
 ### Debian and Ubuntu
 
 ```sh
-sudo apt install ./luti-color-picker_1.8.2-1_amd64.deb
+sudo apt install ./luti-color-picker_1.8.3-1_amd64.deb
 ```
 
 ### Fedora and RPM-based distributions
 
 ```sh
-sudo dnf install ./luti-color-picker-1.8.2-1.x86_64.rpm
+sudo dnf install ./luti-color-picker-1.8.3-1.x86_64.rpm
 ```
 
 ### Arch Linux
 
 ```sh
-sudo pacman -U ./luti-color-picker-1.8.2-1-x86_64.pkg.tar.zst
+sudo pacman -U ./luti-color-picker-1.8.3-1-x86_64.pkg.tar.zst
 ```
 
 ### Flatpak and Snap
@@ -46,7 +46,7 @@ Build these formats using the instructions in the [release guide](docs/RELEASE-G
 
 ### Verify the download
 
-Download `luti-color-picker-1.8.2-SHA256SUMS.txt` alongside your package to verify its SHA-256 checksum. If you downloaded every asset listed in the checksum file, run `sha256sum -c luti-color-picker-1.8.2-SHA256SUMS.txt`.
+Download `luti-color-picker-1.8.3-SHA256SUMS.txt` alongside your package to verify its SHA-256 checksum. If you downloaded every asset listed in the checksum file, run `sha256sum -c luti-color-picker-1.8.3-SHA256SUMS.txt`.
 
 ### Linux archive built from source
 
@@ -66,7 +66,7 @@ Click a history card to open the Shades dialog and browse eleven tones from 50 t
 - **Image colors** extracts dominant colors from an image and saves them as a palette.
 
 Open **Settings** using the gear button to control automatic copying, sound feedback, tray behavior, and startup at login. Startup at login is available for native installations, AppImage, and the `.run` package.
-**Start minimized** is enabled by default. On supported installations, **Start at login** is enabled on first launch when no startup entry exists. You can change both options in **Settings**.
+**Start in the system tray at login** is enabled by default and applies to automatic startup at login. Open the app from your application menu to show the main window. On supported installations, **Start at login** is enabled on first launch when no startup entry exists. You can change both options in **Settings**.
 
 ```sh
 luti-color-picker --pick

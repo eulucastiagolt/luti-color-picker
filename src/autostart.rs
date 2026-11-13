@@ -20,8 +20,29 @@ pub fn enabled() -> bool {
 }
 
 pub fn enable_by_default() -> io::Result<()> {
-    if supported() && !entry_path().try_exists()? {
-        set_enabled(true)?;
+    if !supported() {
+        return Ok(());
+    }
+
+    let path = entry_path();
+    if !path.try_exists()? {
+        return set_enabled(true);
+    }
+
+    let entry = glib::KeyFile::new();
+    let flags = glib::KeyFileFlags::KEEP_COMMENTS | glib::KeyFileFlags::KEEP_TRANSLATIONS;
+    if entry.load_from_file(&path, flags).is_err() {
+        return Ok(());
+    }
+    let Ok(command) = entry.string("Desktop Entry", "Exec") else {
+        return Ok(());
+    };
+    let Ok(arguments) = glib::shell_parse_argv(command.as_str()) else {
+        return Ok(());
+    };
+    if matches!(arguments.as_slice(), [env, separator, _] if env == "env" && separator == "--") {
+        entry.set_string("Desktop Entry", "Exec", &format!("{command} --autostart"));
+        glib::file_set_contents(path, entry.to_data().as_bytes()).map_err(io::Error::other)?;
     }
     Ok(())
 }
@@ -44,7 +65,11 @@ pub fn set_enabled(enabled: bool) -> io::Result<()> {
     let entry = glib::KeyFile::new();
     entry.set_string("Desktop Entry", "Type", "Application");
     entry.set_string("Desktop Entry", "Name", crate::APP_NAME);
-    entry.set_string("Desktop Entry", "Exec", &format!("env -- \"{command}\""));
+    entry.set_string(
+        "Desktop Entry",
+        "Exec",
+        &format!("env -- \"{command}\" --autostart"),
+    );
     entry.set_string("Desktop Entry", "Icon", crate::APP_ID);
     entry.set_boolean("Desktop Entry", "Terminal", false);
     entry.set_boolean("Desktop Entry", "Hidden", !enabled);

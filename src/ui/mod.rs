@@ -26,7 +26,8 @@ use std::rc::Rc;
 
 pub struct MainWindow {
     pub window: ApplicationWindow,
-    _tray_handle: Option<ksni::blocking::Handle<tray::PickTray>>,
+    tray_handle: Option<ksni::blocking::Handle<tray::PickTray>>,
+    background_hold: Rc<RefCell<Option<gio::ApplicationHoldGuard>>>,
     grab: Rc<dyn Fn(Option<String>)>,
     _shortcut: Rc<shortcuts::GlobalShortcut>,
 }
@@ -45,6 +46,16 @@ struct AppInner {
 }
 
 impl MainWindow {
+    pub fn start_in_tray(&self, app: &Application) -> bool {
+        if self.tray_handle.is_none() {
+            return false;
+        }
+        self.background_hold
+            .borrow_mut()
+            .get_or_insert_with(|| app.hold());
+        true
+    }
+
     pub fn capture(&self) {
         let grab = self.grab.clone();
         glib::idle_add_local_once(move || grab(None));
@@ -332,12 +343,13 @@ impl MainWindow {
 
         let (tray_tx, tray_rx) = async_channel::unbounded();
         let tray_handle = tray::spawn_tray(tray_tx);
+        let background_hold = Rc::new(RefCell::new(None));
 
         {
             let inner = inner.clone();
             let can_hide = tray_handle.is_some();
             let app = app.downgrade();
-            let hold = RefCell::new(None);
+            let hold = background_hold.clone();
             window.connect_close_request(move |win| {
                 if let Some((_, _, width, height)) =
                     display_bounds(&gtk::prelude::WidgetExt::display(win))
@@ -403,7 +415,8 @@ impl MainWindow {
 
         MainWindow {
             window,
-            _tray_handle: tray_handle,
+            tray_handle,
+            background_hold,
             grab: grab_fn,
             _shortcut: shortcut,
         }
