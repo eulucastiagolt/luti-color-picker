@@ -26,15 +26,7 @@ On Wayland, Flatpak and Snap can fall back to the desktop portal when Spectacle 
 
 ## Test the packages
 
-| Format | How to run or install |
-| --- | --- |
-| AppImage | Mark the file executable with `chmod +x` and run it. |
-| Portable AppRun | Mark the `.run` file executable with `chmod +x` and run it. |
-| Debian and Ubuntu | `sudo apt install ./luti-color-picker_*.deb` |
-| Fedora | `sudo dnf install ./luti-color-picker-*.rpm` |
-| Arch | `sudo pacman -U ./luti-color-picker-*.pkg.tar.zst` |
-| Flatpak | `flatpak install --user ./luti-color-picker-*.flatpak` |
-| Local Snap | `sudo snap install --dangerous ./luti-color-picker-*.snap` |
+Install or launch the package using the [README](../README.md#installation).
 
 Confirm the version under **About** or by running `luti-color-picker --version`. Capture a pixel, check the copied value, and exercise both history-to-palette modes.
 
@@ -47,7 +39,7 @@ git tag -a v1.8.2 -m "Luti Color Picker 1.8.2"
 git push origin main v1.8.2
 ```
 
-Write the GitHub release notes in English. Use the notes below as a model. Group changes by feature and describe what users can do, where to find each feature, and what changed. Include fixes, verified behavior, and installation commands that match the uploaded filenames. Attach the packages built for the tag. Upload the AppImage and its matching `.AppImage.zsync` file to the same stable release so AppImage managers can find the update for the installed architecture.
+Write the GitHub release notes in English. Use the notes below as a model. Group changes by feature and describe what users can do, where to find each feature, and what changed. Include fixes and verified behavior. Link to the README for installation commands. Attach the packages built for the tag. Upload the AppImage and its matching `.AppImage.zsync` file to the same stable release so AppImage managers can find the update for the installed architecture.
 
 ## GitHub release notes
 
@@ -71,49 +63,9 @@ Luti Color Picker 1.8.2 adds a live text contrast checker, expands the Shades di
 - **Automatic copy after capture.** The magnifier writes the sampled color while the capture window is still open.
 - **Verification.** Sequential History copies and gradient CSS were checked on X11. Automatic copy from the magnifier was checked on KDE Wayland. All 11 automated tests passed.
 
-### Downloads and installation
+### Downloads
 
-All packages attached to this release are for Linux x86_64.
-
-#### AppImage
-
-```sh
-chmod +x luti-color-picker-1.8.2-linux-x86_64.AppImage
-./luti-color-picker-1.8.2-linux-x86_64.AppImage
-```
-
-The AppImage includes GitHub update information. Compatible update managers use the matching `.AppImage.zsync` file. If you have an AppImage older than 1.2.0, download the new AppImage once to switch to a build with embedded update information.
-
-#### Portable launcher
-
-```sh
-chmod +x luti-color-picker-1.8.2-linux-x86_64.run
-./luti-color-picker-1.8.2-linux-x86_64.run
-```
-
-#### Debian and Ubuntu
-
-```sh
-sudo apt install ./luti-color-picker_1.8.2-1_amd64.deb
-```
-
-#### Fedora and RPM-based distributions
-
-```sh
-sudo dnf install ./luti-color-picker-1.8.2-1.x86_64.rpm
-```
-
-#### Arch Linux
-
-```sh
-sudo pacman -U ./luti-color-picker-1.8.2-1-x86_64.pkg.tar.zst
-```
-
-### Requirements and verification
-
-AppImage and the portable launcher use GTK 4 and shared libraries from the host. Flatpak and Snap build recipes are available in the source tree.
-
-Download `luti-color-picker-1.8.2-SHA256SUMS.txt` alongside your package to verify its SHA-256 checksum. If you downloaded every asset listed in the checksum file, run `sha256sum -c luti-color-picker-1.8.2-SHA256SUMS.txt`.
+Linux x86_64 packages and SHA-256 checksums are available in the assets below. See the [installation guide in the README](https://github.com/eulucastiagolt/luti-color-picker/blob/main/README.md#installation) for commands by format.
 
 ### Feedback
 

@@ -4,7 +4,53 @@ Linux color picker with a magnifier, scrollable visual history, and 11 copy form
 
 ## Installation
 
-Extract the Linux archive and run `./install.sh` from the extracted directory. The installer puts the application and desktop entry under `~/.local`. Add `~/.local/bin` to your `PATH` or run `~/.local/bin/luti-color-picker` directly.
+Download the package for your distribution from [GitHub Releases](https://github.com/eulucastiagolt/luti-color-picker/releases/latest). The commands below use the Linux x86_64 files from version 1.8.2. Substitute the filename you downloaded.
+
+### AppImage
+
+```sh
+chmod +x luti-color-picker-1.8.2-linux-x86_64.AppImage
+./luti-color-picker-1.8.2-linux-x86_64.AppImage
+```
+
+The AppImage includes GitHub update information. Compatible update managers use the matching `.AppImage.zsync` file. If you have an AppImage older than 1.2.0, download the new AppImage once to switch to a build with embedded update information.
+
+### Portable launcher
+
+```sh
+chmod +x luti-color-picker-1.8.2-linux-x86_64.run
+./luti-color-picker-1.8.2-linux-x86_64.run
+```
+
+### Debian and Ubuntu
+
+```sh
+sudo apt install ./luti-color-picker_1.8.2-1_amd64.deb
+```
+
+### Fedora and RPM-based distributions
+
+```sh
+sudo dnf install ./luti-color-picker-1.8.2-1.x86_64.rpm
+```
+
+### Arch Linux
+
+```sh
+sudo pacman -U ./luti-color-picker-1.8.2-1-x86_64.pkg.tar.zst
+```
+
+### Flatpak and Snap
+
+Build these formats using the instructions in the [release guide](docs/RELEASE-GUIDE.md#build-release-packages). Install the resulting package with `flatpak install --user ./luti-color-picker-*.flatpak` or `sudo snap install --dangerous ./luti-color-picker-*.snap`.
+
+### Verify the download
+
+Download `luti-color-picker-1.8.2-SHA256SUMS.txt` alongside your package to verify its SHA-256 checksum. If you downloaded every asset listed in the checksum file, run `sha256sum -c luti-color-picker-1.8.2-SHA256SUMS.txt`.
+
+### Linux archive built from source
+
+If you built a Linux archive from source, extract it and run `./install.sh` from the extracted directory. The installer puts the application and desktop entry under `~/.local`. Add `~/.local/bin` to your `PATH` or run `~/.local/bin/luti-color-picker` directly.
 
 The application requires GTK 4 and system libraries compatible with the build. On Wayland, the magnifier uses Spectacle on KDE Plasma or grim on compatible compositors. The XDG Desktop Portal fallback depends on the compositor and returns the selected color without a context thumbnail. Feedback sounds use the session's default PulseAudio or PipeWire output, with `pw-play` and `aplay` as fallbacks.
 
@@ -55,6 +101,6 @@ cargo run --locked
 
 Build on a distribution compatible with your intended users. The package is written to `dist/`.
 
-Run `make build` or `make dist` to build all available formats. The packaging script reports missing tools and build failures separately. Run `./scripts/build-package.sh FORMAT` to build a single format. See the [release guide](docs/RELEASE-GUIDE.md) for tooling and installation instructions.
+Run `make build` or `make dist` to build all available formats. The packaging script reports missing tools and build failures separately. Run `./scripts/build-package.sh FORMAT` to build a single format. See the [release guide](docs/RELEASE-GUIDE.md) for packaging tools and release verification.
 
 Rust version author **Lucas Tiago**. See [LICENSE](LICENSE) for the MIT terms and copyright notices.
