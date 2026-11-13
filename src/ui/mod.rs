@@ -11,7 +11,7 @@ pub mod tray;
 use crate::capture;
 use crate::color::formatters::{format_color, FORMAT_NAMES};
 use crate::color::ColorDatabase;
-use crate::storage::{load_state, save_state, AppState, HistoryColorItem, WindowMetrics};
+use crate::storage::{save_state, AppState, HistoryColorItem, WindowMetrics};
 use color_card::ColorCard;
 use gdk::prelude::*;
 use gdk_pixbuf::Pixbuf;
@@ -50,7 +50,12 @@ impl MainWindow {
         glib::idle_add_local_once(move || grab(None));
     }
 
-    pub fn new(app: &Application, snark_mode: bool, force_background: bool) -> Self {
+    pub fn new(
+        app: &Application,
+        snark_mode: bool,
+        force_background: bool,
+        initial_state: AppState,
+    ) -> Self {
         let window = ApplicationWindow::new(app);
         window.set_title(Some(crate::APP_NAME));
         window.add_css_class("luti");
@@ -113,8 +118,6 @@ impl MainWindow {
         tabs.set_scrollable(true);
         tabs.append_page(&history_stack, Some(&Label::new(Some("History"))));
         window.set_child(Some(&tabs));
-
-        let initial_state = load_state();
 
         let inner = Rc::new(RefCell::new(AppInner {
             sound: Rc::new(Cell::new(initial_state.settings.sound)),

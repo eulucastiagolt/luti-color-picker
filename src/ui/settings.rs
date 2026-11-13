@@ -35,6 +35,7 @@ pub(super) fn show(
     let choose_palette = CheckButton::with_label("Ask which palette to add history colors to");
     let background = CheckButton::with_label("Keep running in the tray when the window closes");
     let start_at_login = CheckButton::with_label("Start at login");
+    let start_minimized = CheckButton::with_label("Start minimized");
     let global_shortcut = CheckButton::with_label("Register a global shortcut to capture a color");
     global_shortcut.set_active(current.global_shortcut);
     let autostart_supported = autostart::supported();
@@ -47,6 +48,7 @@ pub(super) fn show(
     sound.set_active(current.sound);
     choose_palette.set_active(current.choose_palette_for_history);
     background.set_active(current.background);
+    start_minimized.set_active(current.start_minimized);
 
     let content = dialog.content_area();
     content.set_spacing(10);
@@ -62,6 +64,7 @@ pub(super) fn show(
     let max_zoom = zoom_input(&content, "Ma_ximum magnifier zoom (×)", *zoom_range.end());
     content.append(&background);
     content.append(&start_at_login);
+    content.append(&start_minimized);
     content.append(&global_shortcut);
     let shortcut_status = Label::new(None);
     shortcut_status.set_xalign(0.0);
@@ -113,6 +116,7 @@ pub(super) fn show(
                 auto_copy: auto_copy.is_active(),
                 sound: sound.is_active(),
                 background: background.is_active(),
+                start_minimized: start_minimized.is_active(),
                 global_shortcut: global_shortcut.is_active(),
                 min_zoom: min_zoom.value_as_int(),
                 max_zoom: max_zoom.value_as_int(),

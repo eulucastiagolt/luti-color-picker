@@ -14,6 +14,16 @@
   <launchable type="desktop-id">io.github.eulucastiagolt.LutiColorPicker.desktop</launchable>
   <url type="homepage">https://github.com/eulucastiagolt/luti-color-picker</url>
   <releases>
+    <release version="1.7.1" date="2026-11-13">
+      <description>
+        <p>Enable minimized startup and startup at login by default on supported installations.</p>
+      </description>
+    </release>
+    <release version="1.7.0" date="2026-11-13">
+      <description>
+        <p>Start the application minimized with a new Settings option.</p>
+      </description>
+    </release>
     <release version="1.6.2" date="2026-11-12">
       <description>
         <p>Match palette dialogs to the application theme.</p>

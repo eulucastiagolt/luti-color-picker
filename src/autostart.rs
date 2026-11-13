@@ -19,14 +19,15 @@ pub fn enabled() -> bool {
         && !entry.boolean("Desktop Entry", "Hidden").unwrap_or(false)
 }
 
+pub fn enable_by_default() -> io::Result<()> {
+    if supported() && !entry_path().try_exists()? {
+        set_enabled(true)?;
+    }
+    Ok(())
+}
+
 pub fn set_enabled(enabled: bool) -> io::Result<()> {
     let path = entry_path();
-    if !enabled {
-        return match std::fs::remove_file(path) {
-            Err(error) if error.kind() == io::ErrorKind::NotFound => Ok(()),
-            result => result,
-        };
-    }
 
     let executable = launcher()?;
     let executable = executable
@@ -46,6 +47,7 @@ pub fn set_enabled(enabled: bool) -> io::Result<()> {
     entry.set_string("Desktop Entry", "Exec", &format!("env -- \"{command}\""));
     entry.set_string("Desktop Entry", "Icon", crate::APP_ID);
     entry.set_boolean("Desktop Entry", "Terminal", false);
+    entry.set_boolean("Desktop Entry", "Hidden", !enabled);
 
     std::fs::create_dir_all(glib::user_config_dir().join("autostart"))?;
     glib::file_set_contents(path, entry.to_data().as_bytes()).map_err(io::Error::other)

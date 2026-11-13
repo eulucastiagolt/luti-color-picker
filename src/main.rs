@@ -55,11 +55,22 @@ fn main() {
 
             let window = {
                 let mut current = current_window.borrow_mut();
-                let main_window = current
-                    .get_or_insert_with(|| MainWindow::new(app, args.snark, args.background));
+                let mut start_minimized = false;
+                let main_window = current.get_or_insert_with(|| {
+                    if let Err(error) = autostart::enable_by_default() {
+                        eprintln!("Could not enable startup at login: {error}");
+                    }
+                    let state = storage::load_state();
+                    start_minimized = state.settings.start_minimized;
+                    MainWindow::new(app, args.snark, args.background, state)
+                });
                 if args.pick {
                     main_window.capture();
+                } else if start_minimized && !args.about {
+                    main_window.window.minimize();
+                    main_window.window.set_visible(true);
                 } else {
+                    main_window.window.unminimize();
                     main_window.window.present();
                 }
                 main_window.window.clone()

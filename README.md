@@ -19,6 +19,7 @@ Click a history card to open the Shades dialog. The **Copy** button on the card 
 - **Image colors** extracts dominant colors from an image and saves them as a palette.
 
 Open **Settings** using the gear button to control automatic copying, sound feedback, tray behavior, and startup at login. Startup at login is available for native installations, AppImage, and the `.run` package.
+**Start minimized** is enabled by default. On supported installations, **Start at login** is enabled on first launch when no startup entry exists. You can change both options in **Settings**.
 
 ```sh
 luti-color-picker --pick

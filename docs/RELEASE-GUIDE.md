@@ -1,4 +1,4 @@
-# Luti Color Picker 1.6.2
+# Luti Color Picker 1.7.1
 
 ## Build release packages
 
@@ -43,13 +43,15 @@ Confirm the version under **About** or by running `luti-color-picker --version`.
 Review and commit the release changes. Create an annotated tag and push it together with the release commit.
 
 ```sh
-git tag -a v1.6.2 -m "Luti Color Picker 1.6.2"
-git push origin main v1.6.2
+git tag -a v1.7.1 -m "Luti Color Picker 1.7.1"
+git push origin main v1.7.1
 ```
 
 Use the notes below for the GitHub release and attach the packages built for the tag. Upload the AppImage and its matching `.AppImage.zsync` file to the same stable release. Keep their generated filenames so AppImage managers can find the right update for the installed architecture.
 
 ## GitHub release notes
+
+Start minimized is enabled by default. On supported installations, the app also enables startup at login on its first launch if no startup entry exists. Both options can be changed in Settings.
 
 Open Shades from History or Palettes to view, copy, and save individual tones. Each shade has its own row with its HEX code and actions to copy it or add it to a palette. Palette colors can be copied and edited by HEX.
 
@@ -61,4 +63,4 @@ The magnifier now follows the pointer across monitors during one capture session
 
 The x86_64 release includes AppImage, a portable `.run` launcher, Debian/Ubuntu, RPM, and Arch Linux packages. Flatpak and Snap build recipes are available in the source tree.
 
-If you currently use an AppImage from a release before 1.2.0, download the 1.6.2 AppImage once to switch to a build with embedded update information. The `.zsync` file is used by update tools. To launch the app, download the `.AppImage` file.
+If you currently use an AppImage from a release before 1.2.0, download the 1.7.1 AppImage once to switch to a build with embedded update information. The `.zsync` file is used by update tools. To launch the app, download the `.AppImage` file.
