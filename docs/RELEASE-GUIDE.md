@@ -40,31 +40,81 @@ Confirm the version under **About** or by running `luti-color-picker --version`.
 
 ## Tag and publish
 
-Review and commit the release changes. Create an annotated tag and push it together with the release commit.
+Review the changes since the previous public tag. Write the release commit in English, with `Release Luti Color Picker X.Y.Z` as its subject. In the body, summarize the user-facing features and fixes, list any changes to packaging or updates, and record the validation performed. Create an annotated tag and push it together with the release commit.
 
 ```sh
 git tag -a v1.8.2 -m "Luti Color Picker 1.8.2"
 git push origin main v1.8.2
 ```
 
-Use the notes below for the GitHub release and attach the packages built for the tag. Upload the AppImage and its matching `.AppImage.zsync` file to the same stable release. Keep their generated filenames so AppImage managers can find the right update for the installed architecture.
+Write the GitHub release notes in English. Use the notes below as a model. Group changes by feature and describe what users can do, where to find each feature, and what changed. Include fixes, verified behavior, and installation commands that match the uploaded filenames. Attach the packages built for the tag. Upload the AppImage and its matching `.AppImage.zsync` file to the same stable release so AppImage managers can find the update for the installed architecture.
 
 ## GitHub release notes
 
-Copy actions use the system clipboard through GTK. The magnifier copies the picked color before closing its windows.
+Luti Color Picker 1.8.2 adds a live text contrast checker, expands the Shades dialog to eleven tones, and improves clipboard reliability on Linux.
 
-The Color Contrast Checker previews text on a background and reports the WCAG 2.2 AA and AAA contrast results with green Pass and red Fail indicators. Shades now generates eleven Oklab tones from 50 to 950 and marks the original color.
+### What's new in 1.8.2
 
-Start minimized is enabled by default. On supported installations, the app also enables startup at login on its first launch if no startup entry exists. Both options can be changed in Settings.
+#### Color Contrast Checker
 
-Open Shades from History or Palettes to view, copy, and save individual tones. Each shade has its own row with its HEX code and actions to copy it or add it to a palette. Palette colors can be copied and edited by HEX.
+- **Live preview.** Open **Color Contrast Checker** and enter HEX codes or use the color selectors to set the text and background colors. Use **Swap** to reverse the pair.
+- **WCAG 2.2 results.** See the contrast ratio and separate results for normal and large text at levels AA and AAA. Green **Pass** and red **Fail** labels show which thresholds the pair meets.
 
-Palette dialogs use the application title bar and consistent content spacing.
+#### Shades
 
-The magnifier now follows the pointer across monitors during one capture session.
+- **Eleven tones.** Open **Shades** from **History** or **Palettes** to see an Oklab scale from 50 to 950. The source color is marked **Original**.
+- **Individual shade actions.** Each row shows its HEX code and has its own **Copy** and **Add to palette** buttons.
 
-### Linux downloads
+### Clipboard fixes
 
-The x86_64 release includes AppImage, a portable `.run` launcher, Debian/Ubuntu, RPM, and Arch Linux packages. Flatpak and Snap build recipes are available in the source tree.
+- **Copy colors and gradient CSS.** The app writes directly to the GTK system clipboard, avoiding the wait for a separate clipboard command.
+- **Automatic copy after capture.** The magnifier writes the sampled color while the capture window is still open.
+- **Verification.** Sequential History copies and gradient CSS were checked on X11. Automatic copy from the magnifier was checked on KDE Wayland. All 11 automated tests passed.
 
-If you currently use an AppImage from a release before 1.2.0, download the 1.8.2 AppImage once to switch to a build with embedded update information. The `.zsync` file is used by update tools. To launch the app, download the `.AppImage` file.
+### Downloads and installation
+
+All packages attached to this release are for Linux x86_64.
+
+#### AppImage
+
+```sh
+chmod +x luti-color-picker-1.8.2-linux-x86_64.AppImage
+./luti-color-picker-1.8.2-linux-x86_64.AppImage
+```
+
+The AppImage includes GitHub update information. Compatible update managers use the matching `.AppImage.zsync` file. If you have an AppImage older than 1.2.0, download the new AppImage once to switch to a build with embedded update information.
+
+#### Portable launcher
+
+```sh
+chmod +x luti-color-picker-1.8.2-linux-x86_64.run
+./luti-color-picker-1.8.2-linux-x86_64.run
+```
+
+#### Debian and Ubuntu
+
+```sh
+sudo apt install ./luti-color-picker_1.8.2-1_amd64.deb
+```
+
+#### Fedora and RPM-based distributions
+
+```sh
+sudo dnf install ./luti-color-picker-1.8.2-1.x86_64.rpm
+```
+
+#### Arch Linux
+
+```sh
+sudo pacman -U ./luti-color-picker-1.8.2-1-x86_64.pkg.tar.zst
+```
+
+### Requirements and verification
+
+AppImage and the portable launcher use GTK 4 and shared libraries from the host. Flatpak and Snap build recipes are available in the source tree.
+
+Download `luti-color-picker-1.8.2-SHA256SUMS.txt` alongside your package to verify its SHA-256 checksum. If you downloaded every asset listed in the checksum file, run `sha256sum -c luti-color-picker-1.8.2-SHA256SUMS.txt`.
+
+### Feedback
+
+Report bugs or request improvements on [GitHub Issues](https://github.com/eulucastiagolt/luti-color-picker/issues).
