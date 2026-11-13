@@ -62,17 +62,12 @@ fn populate_shades(
     dialog: &Dialog,
     add_to_palette: &Rc<impl Fn(Rgb) + 'static>,
 ) {
-    for (target, amount, description) in [
-        (255.0, 0.45, "Lightest"),
-        (255.0, 0.22, "Lighter"),
-        (255.0, 0.0, "Original"),
-        (0.0, 0.22, "Darker"),
-        (0.0, 0.45, "Darkest"),
-    ] {
-        let rgb = base.map(|channel| {
-            let channel = f64::from(channel);
-            (channel + (target - channel) * amount).round() as u8
-        });
+    for (level, rgb, original) in crate::color::tones::shades(base) {
+        let description = if original {
+            format!("{level} · Original")
+        } else {
+            level.to_string()
+        };
         let code = hex(rgb);
         let row = GtkBox::new(Orientation::Horizontal, 10);
         row.add_css_class("color-card");
@@ -88,8 +83,7 @@ fn populate_shades(
         copy.set_tooltip_text(Some(&format!("Copy {code}")));
         let sound = sound.clone();
         copy.connect_clicked(move |_| {
-            copy_to_clipboard(&code);
-            if sound.get() {
+            if copy_to_clipboard(&code) && sound.get() {
                 crate::audio::Feedback::Copy.play();
             }
         });
@@ -231,7 +225,9 @@ impl ColorCard {
             let label = label.clone();
             let current_formatted = current_formatted.clone();
             move |_| {
-                copy_to_clipboard(&current_formatted.borrow());
+                if !copy_to_clipboard(&current_formatted.borrow()) {
+                    return;
+                }
                 label.add_css_class("highlighted");
                 let label_weak = label.downgrade();
                 glib::timeout_add_local_once(std::time::Duration::from_millis(300), move || {

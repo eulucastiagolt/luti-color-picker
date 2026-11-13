@@ -4,6 +4,7 @@ pub mod formatters;
 pub mod names;
 pub mod snark;
 pub mod studio;
+pub mod tones;
 
 use std::collections::HashMap;
 

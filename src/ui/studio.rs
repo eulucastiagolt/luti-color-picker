@@ -3,6 +3,7 @@ use crate::color::studio::{
     export_palette, extract_colors, fractions, hex, render_png, GradientStop, Palette,
     PaletteFormat, Rgb, Swatch,
 };
+use crate::color::tones::contrast_ratio;
 use gtk::prelude::*;
 use gtk::{
     Align, ApplicationWindow, Box as GtkBox, Button, ColorButton, ComboBoxText, Dialog,
@@ -34,6 +35,10 @@ pub(super) fn add_pages(
         tabs,
     );
     tabs.append_page(&extract, Some(&Label::new(Some("Image colors"))));
+    tabs.append_page(
+        &contrast_page(),
+        Some(&Label::new(Some("Color Contrast Checker"))),
+    );
     editor
 }
 
@@ -94,6 +99,139 @@ fn parse_hex_color(text: &str) -> Option<Rgb> {
 fn selected_rgb(button: &ColorButton) -> Rgb {
     let color = button.rgba();
     [color.red(), color.green(), color.blue()].map(|value| (value * 255.0).round() as u8)
+}
+
+fn contrast_page() -> GtkBox {
+    let root = page();
+    let inputs = GtkBox::new(Orientation::Horizontal, 8);
+    let foreground = contrast_color_input(&inputs, "Text color", [0x17, 0x13, 0x1f]);
+    let background = contrast_color_input(&inputs, "Background color", [255; 3]);
+    let swap = Button::with_label("Swap");
+    swap.set_valign(Align::End);
+    inputs.append(&swap);
+    root.append(&inputs);
+
+    let preview = label("");
+    preview.set_xalign(0.5);
+    preview.add_css_class("contrast-preview");
+    let style = gtk::CssProvider::new();
+    preview
+        .style_context()
+        .add_provider(&style, gtk::STYLE_PROVIDER_PRIORITY_APPLICATION + 1);
+    root.append(&preview);
+
+    let ratio_label = label("");
+    ratio_label.add_css_class("contrast-ratio");
+    root.append(&ratio_label);
+    let results = GtkBox::new(Orientation::Vertical, 6);
+    results.append(&label("WCAG 2.2 text contrast"));
+    let checks = [
+        ("AA normal (4.5:1)", 4.5),
+        ("AA large (3:1)", 3.0),
+        ("AAA normal (7:1)", 7.0),
+        ("AAA large (4.5:1)", 4.5),
+    ]
+    .map(|(name, minimum)| {
+        let row = GtkBox::new(Orientation::Horizontal, 8);
+        let name = label(name);
+        name.set_hexpand(true);
+        row.append(&name);
+        let status = Label::new(None);
+        status.add_css_class("contrast-status");
+        row.append(&status);
+        results.append(&row);
+        (minimum, status)
+    });
+    root.append(&results);
+
+    let update = {
+        let foreground = foreground.downgrade();
+        let background = background.downgrade();
+        let swap = swap.downgrade();
+        move |_: &Entry| {
+            let (Some(foreground), Some(background), Some(swap)) =
+                (foreground.upgrade(), background.upgrade(), swap.upgrade())
+            else {
+                return;
+            };
+            let text = parse_hex_color(&foreground.text());
+            let surface = parse_hex_color(&background.text());
+            swap.set_sensitive(text.is_some() && surface.is_some());
+            let (Some(text), Some(surface)) = (text, surface) else {
+                preview.set_visible(false);
+                ratio_label.set_text("Enter two six-digit HEX colors.");
+                results.set_visible(false);
+                return;
+            };
+            let ratio = contrast_ratio(text, surface);
+            let text = hex(text);
+            let surface = hex(surface);
+            style.load_from_data(&format!("label.contrast-preview {{ background-color: {surface}; color: {text}; }}"));
+            preview.set_markup("<span size='x-large' weight='bold'>Large text</span>\n<span size='medium'>Normal text preview</span>");
+            preview.set_visible(true);
+            let displayed_ratio = (ratio * 100.0).floor() / 100.0;
+            ratio_label.set_text(&format!("{displayed_ratio:.2}:1"));
+            for (minimum, status) in &checks {
+                if ratio >= *minimum {
+                    status.set_text("Pass");
+                    status.remove_css_class("fail");
+                    status.add_css_class("pass");
+                } else {
+                    status.set_text("Fail");
+                    status.remove_css_class("pass");
+                    status.add_css_class("fail");
+                }
+            }
+            results.set_visible(true);
+        }
+    };
+    update(&foreground);
+    foreground.connect_changed(update.clone());
+    background.connect_changed(update);
+    swap.connect_clicked(move |_| {
+        let text = foreground.text();
+        foreground.set_text(&background.text());
+        background.set_text(&text);
+    });
+    root
+}
+
+fn contrast_color_input(parent: &GtkBox, title: &str, rgb: Rgb) -> Entry {
+    let group = GtkBox::new(Orientation::Vertical, 6);
+    group.set_hexpand(true);
+    let title_label = label(title);
+    group.append(&title_label);
+    let row = GtkBox::new(Orientation::Horizontal, 6);
+    let entry = Entry::new();
+    entry.set_text(&hex(rgb));
+    entry.set_width_chars(8);
+    title_label.set_mnemonic_widget(Some(&entry));
+    entry.set_hexpand(true);
+    row.append(&entry);
+
+    let picker = color_button(rgb);
+    picker.set_title(title);
+    let picker_ref = picker.downgrade();
+    entry.connect_changed(move |entry| {
+        if let Some(rgb) = parse_hex_color(&entry.text()) {
+            entry.remove_css_class("error");
+            if let Some(picker) = picker_ref.upgrade() {
+                picker.set_rgba(&rgba(rgb));
+            }
+        } else {
+            entry.add_css_class("error");
+        }
+    });
+    let entry_ref = entry.downgrade();
+    picker.connect_color_set(move |picker| {
+        if let Some(entry) = entry_ref.upgrade() {
+            entry.set_text(&hex(selected_rgb(picker)));
+        }
+    });
+    row.append(&picker);
+    group.append(&row);
+    parent.append(&group);
+    entry
 }
 
 fn dialog(parent: &ApplicationWindow, title: &str, accept: &str) -> Dialog {
@@ -354,8 +492,7 @@ impl PaletteEditor {
             let code = hex(color.rgb);
             let sound = self.inner.borrow().sound.clone();
             copy.connect_clicked(move |_| {
-                clipboard::copy_to_clipboard(&code);
-                if sound.get() {
+                if clipboard::copy_to_clipboard(&code) && sound.get() {
                     crate::audio::Feedback::Copy.play();
                 }
             });
@@ -745,7 +882,10 @@ fn gradient_page(window: &ApplicationWindow, inner: &State) -> GtkBox {
         let status = status.clone();
         let sound = inner.borrow().sound.clone();
         move |_| {
-            clipboard::copy_to_clipboard(&css.text());
+            if !clipboard::copy_to_clipboard(&css.text()) {
+                status.set_text("Could not copy CSS.");
+                return;
+            }
             status.set_text("CSS copied.");
             if sound.get() {
                 crate::audio::Feedback::Copy.play();

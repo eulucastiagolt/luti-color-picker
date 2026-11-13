@@ -246,9 +246,6 @@ impl MainWindow {
                         )
                     };
 
-                    let reset_picker_1 = reset_picker.clone();
-                    let reset_picker_2 = reset_picker;
-
                     MagnifierOverlay::start(
                         screens,
                         fmt,
@@ -256,12 +253,9 @@ impl MainWindow {
                         snark_mode,
                         token,
                         move |r, g, b, crop| {
-                            reset_picker_1();
                             Self::finish_capture(&inner_c, (r, g, b), Some(crop));
                         },
-                        move || {
-                            reset_picker_2();
-                        },
+                        reset_picker,
                     );
                 } else {
                     // Fallback to portal if screenshot tool is missing
@@ -431,15 +425,16 @@ impl MainWindow {
         if inner.state.settings.auto_copy {
             let name = inner.color_db.closest_name(r, g, b);
             let formatted = format_color(&inner.state.formatter, r, g, b, name);
-            clipboard::copy_to_clipboard(&formatted);
-            if let Some(card) = inner.cards.last() {
-                card.label.style_context().add_class("highlighted");
-                let label = card.label.downgrade();
-                glib::timeout_add_local_once(std::time::Duration::from_millis(300), move || {
-                    if let Some(label) = label.upgrade() {
-                        label.style_context().remove_class("highlighted");
-                    }
-                });
+            if clipboard::copy_to_clipboard(&formatted) {
+                if let Some(card) = inner.cards.last() {
+                    card.label.style_context().add_class("highlighted");
+                    let label = card.label.downgrade();
+                    glib::timeout_add_local_once(std::time::Duration::from_millis(300), move || {
+                        if let Some(label) = label.upgrade() {
+                            label.style_context().remove_class("highlighted");
+                        }
+                    });
+                }
             }
         }
         if inner.sound.get() {

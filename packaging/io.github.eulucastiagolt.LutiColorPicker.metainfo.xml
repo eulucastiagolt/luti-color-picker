@@ -14,6 +14,21 @@
   <launchable type="desktop-id">io.github.eulucastiagolt.LutiColorPicker.desktop</launchable>
   <url type="homepage">https://github.com/eulucastiagolt/luti-color-picker</url>
   <releases>
+    <release version="1.8.2" date="2026-11-13">
+      <description>
+        <p>Improve clipboard reliability when copying colors and gradients.</p>
+      </description>
+    </release>
+    <release version="1.8.1" date="2026-11-13">
+      <description>
+        <p>Highlight passing and failing contrast results in green and red.</p>
+      </description>
+    </release>
+    <release version="1.8.0" date="2026-11-13">
+      <description>
+        <p>Check WCAG text contrast and generate eleven shades with an Oklab color scale.</p>
+      </description>
+    </release>
     <release version="1.7.1" date="2026-11-13">
       <description>
         <p>Enable minimized startup and startup at login by default on supported installations.</p>

@@ -155,3 +155,30 @@ window.luti {
     background: #5f452d;
     border-radius: 4px;
 }
+
+.luti .contrast-preview {
+    border-radius: 10px;
+    padding: 24px 12px;
+}
+
+.luti .contrast-ratio {
+    font-size: 1.6em;
+    font-weight: 750;
+}
+
+.luti .contrast-status {
+    min-width: 48px;
+    padding: 3px 8px;
+    border-radius: 6px;
+    font-weight: 700;
+}
+
+.luti .contrast-status.pass {
+    background: #18392b;
+    color: #a7f3c5;
+}
+
+.luti .contrast-status.fail {
+    background: #4a222d;
+    color: #ffc2cc;
+}

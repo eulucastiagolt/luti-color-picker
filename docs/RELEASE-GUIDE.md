@@ -1,4 +1,4 @@
-# Luti Color Picker 1.7.1
+# Luti Color Picker 1.8.2
 
 ## Build release packages
 
@@ -43,13 +43,17 @@ Confirm the version under **About** or by running `luti-color-picker --version`.
 Review and commit the release changes. Create an annotated tag and push it together with the release commit.
 
 ```sh
-git tag -a v1.7.1 -m "Luti Color Picker 1.7.1"
-git push origin main v1.7.1
+git tag -a v1.8.2 -m "Luti Color Picker 1.8.2"
+git push origin main v1.8.2
 ```
 
 Use the notes below for the GitHub release and attach the packages built for the tag. Upload the AppImage and its matching `.AppImage.zsync` file to the same stable release. Keep their generated filenames so AppImage managers can find the right update for the installed architecture.
 
 ## GitHub release notes
+
+Copy actions use the system clipboard through GTK. The magnifier copies the picked color before closing its windows.
+
+The Color Contrast Checker previews text on a background and reports the WCAG 2.2 AA and AAA contrast results with green Pass and red Fail indicators. Shades now generates eleven Oklab tones from 50 to 950 and marks the original color.
 
 Start minimized is enabled by default. On supported installations, the app also enables startup at login on its first launch if no startup entry exists. Both options can be changed in Settings.
 
@@ -63,4 +67,4 @@ The magnifier now follows the pointer across monitors during one capture session
 
 The x86_64 release includes AppImage, a portable `.run` launcher, Debian/Ubuntu, RPM, and Arch Linux packages. Flatpak and Snap build recipes are available in the source tree.
 
-If you currently use an AppImage from a release before 1.2.0, download the 1.7.1 AppImage once to switch to a build with embedded update information. The `.zsync` file is used by update tools. To launch the app, download the `.AppImage` file.
+If you currently use an AppImage from a release before 1.2.0, download the 1.8.2 AppImage once to switch to a build with embedded update information. The `.zsync` file is used by update tools. To launch the app, download the `.AppImage` file.

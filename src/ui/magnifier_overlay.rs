@@ -26,7 +26,7 @@ impl MagnifierOverlay {
         snark_mode: bool,
         activation_token: Option<String>,
         on_pick: F,
-        on_cancel: C,
+        on_close: C,
     ) where
         F: Fn(u8, u8, u8, Pixbuf) + 'static,
         C: Fn() + 'static,
@@ -39,14 +39,13 @@ impl MagnifierOverlay {
                 if finished.replace(true) {
                     return;
                 }
+                if let Some((r, g, b, crop)) = color {
+                    on_pick(r, g, b, crop);
+                }
                 for window in windows.borrow().iter().filter_map(glib::WeakRef::upgrade) {
                     window.destroy();
                 }
-                if let Some((r, g, b, crop)) = color {
-                    on_pick(r, g, b, crop);
-                } else {
-                    on_cancel();
-                }
+                on_close();
             })
         };
         let zoom = Rc::new(Cell::new(3.clamp(*zoom_range.start(), *zoom_range.end())));
